@@ -44,6 +44,7 @@ URL пакета должен быть прямым URL на файл и дол�
 - [PlayStation Store — каталог](https://store.playstation.com/ru-ru/category/30749d2c-738f-4c36-9d6b-7ed517cca9ee/)
 - [Rocket League — поиск в Store](https://store.playstation.com/ru-ru/search/rocket%20league)
 - [Brawlhalla — поиск в Store](https://store.playstation.com/ru-ru/search/brawlhalla)
+- [Fall Guys — поиск в Store](https://store.playstation.com/ru-ru/search/fall%20guys)
 
 Эти страницы служат источниками информации о продуктах. Они не являются прямыми URL для загрузки PKG.
 
