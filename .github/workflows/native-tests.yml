@@ -18,11 +18,22 @@ permissions:
 jobs:
   queue-tests:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: strict compiler
+            flags: "-O2"
+          - name: address and undefined behavior sanitizers
+            flags: "-O1 -g -fsanitize=address,undefined -fno-omit-frame-pointer"
+    name: ${{ matrix.name }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Install C compiler and make
         run: sudo apt-get update && sudo apt-get install -y build-essential
-      - name: Compile with warnings as errors and run tests
+      - name: Compile and run queue tests
         working-directory: native
-        run: make test
+        env:
+          CFLAGS: "-std=c11 -Wall -Wextra -Werror -pedantic ${{ matrix.flags }}"
+        run: make clean test
