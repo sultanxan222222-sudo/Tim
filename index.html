@@ -67,5 +67,75 @@ document.getElementById('filter').addEventListener('change',renderGames);
 renderSources();renderGames();
 fetch('./catalog.json').then(r=>{if(!r.ok)throw Error('catalog unavailable');return r.json()}).then(d=>{if(d&&Array.isArray(d.games)&&Array.isArray(d.sources)){data=d;renderSources();renderGames()}}).catch(()=>{});
 </script>
+
+<style>
+.extra-controls{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 18px}.extra-controls input,.extra-controls select{flex:1;min-width:180px}
+.remote-box{padding:14px;border:1px solid var(--line);border-radius:14px;background:var(--panel);margin:0 0 20px}.remote-box small{display:block;color:var(--muted);margin-top:8px}
+.details-overlay{position:fixed;inset:0;background:#000b;z-index:99;display:grid;place-items:center;padding:16px}.details-box{width:min(640px,100%);max-height:85vh;overflow:auto;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}.details-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin:16px 0}.details-grid div{padding:10px;border-radius:9px;background:var(--panel2)}.details-grid small{display:block;color:var(--muted)}.extra-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}.extra-actions>*{flex:1}.hidden-extra{display:none!important}
+</style>
+<div class="remote-box">
+  <strong>Подключить JSON-каталог FPKGi</strong>
+  <div class="extra-controls" style="margin:10px 0 0">
+    <input id="remote-json-url" type="url" placeholder="URL удалённого JSON-каталога" aria-label="URL удалённого JSON-каталога">
+    <button id="remote-json-load" type="button">Загрузить каталог</button>
+    <button id="remote-json-reset" type="button">Вернуть мой каталог</button>
+  </div>
+  <small>Принимает формат FPKGi DATA и формат catalog.json проекта. Для удалённого адреса сервер должен разрешать запросы из браузера (CORS).</small>
+</div>
+<div class="extra-controls">
+  <select id="extra-sort" aria-label="Сортировка каталога">
+    <option value="name-asc">Название А–Я</option><option value="name-desc">Название Я–А</option>
+    <option value="size-asc">Размер: сначала меньшие</option><option value="size-desc">Размер: сначала большие</option>
+    <option value="region">По региону</option>
+  </select>
+</div>
+<div id="extra-details" class="details-overlay hidden-extra" role="dialog" aria-modal="true"><div class="details-box"><button id="extra-close" type="button" style="float:right">Закрыть ✕</button><div id="extra-details-content"></div></div></div>
+<script>
+(function(){
+  var originalFallback = data;
+  var currentSort = 'name-asc';
+  function safeSize(v){var n=Number(v);if(!Number.isFinite(n)||n<=0)return '—';var units=['Б','КБ','МБ','ГБ','ТБ'],i=0;while(n>=1024&&i<units.length-1){n/=1024;i++}return n.toFixed(i?1:0)+' '+units[i]}
+  function normalize(raw){
+    if(raw&&Array.isArray(raw.games))return {games:raw.games.map(function(g,i){return Object.assign({id:g.id||g.titleId||g.title||String(i),title:g.title||g.name||'Без названия',category:g.category||'Games',titleId:g.titleId||g.title_id||'',region:g.region||'UNK',version:g.version||'—',release:g.release||'',size:g.size||null,min_fw:g.min_fw||null,coverImage:g.coverImage||g.cover_url||null,downloadUrl:g.downloadUrl||g.url||null,notes:g.notes||''},g)}),sources:Array.isArray(raw.sources)?raw.sources:[]};
+    if(raw&&raw.DATA&&typeof raw.DATA==='object'){
+      return {sources:[],games:Object.keys(raw.DATA).map(function(url,i){var m=raw.DATA[url]||{};return {id:m.title_id||m.titleId||m.name||String(i),title:m.name||m.title||'Без названия',titleId:m.title_id||m.titleId||'',category:m.category||'Games',region:m.region||'UNK',version:m.version||'—',release:m.release||'',size:m.size||null,min_fw:m.min_fw||null,coverImage:m.cover_url||null,downloadUrl:url,notes:m.notes||'Элемент удалённого каталога FPKGi'}})};
+    }
+    throw new Error('Неподдерживаемый JSON-формат');
+  }
+  window.renderGames = function(){
+    var q=document.getElementById('search').value.trim().toLowerCase();
+    var cat=document.getElementById('filter').value;
+    var items=data.games.filter(function(g){return (String(g.title||'')+' '+String(g.titleId||g.title_id||'')+' '+String(g.category||'')+' '+String(g.region||'')+' '+String(g.notes||'')).toLowerCase().indexOf(q)>=0&&(cat==='all'||g.category===cat)});
+    items.sort(function(a,b){if(currentSort.indexOf('size-')===0){var d=(Number(a.size)||0)-(Number(b.size)||0);return currentSort==='size-asc'?d:-d}if(currentSort==='region')return String(a.region||'').localeCompare(String(b.region||''));var n=String(a.title||'').localeCompare(String(b.title||''));return currentSort==='name-desc'?-n:n});
+    var host=document.getElementById('games');
+    host.innerHTML=items.length?items.map(function(g){
+      var src=data.sources.find(function(x){return x.id===g.sourceId});
+      var coverClass=String(g.coverClass||'generic').replace(/[^a-z0-9_-]/gi,'');
+      var cover=g.coverImage?'<img src="'+esc(g.coverImage)+'" alt="Обложка '+esc(g.title)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove()"><span class="cover-shade"></span>':'';
+      var direct=g.downloadUrl?'<a class="link" href="'+esc(g.downloadUrl)+'" target="_blank" rel="noopener noreferrer">Открыть пакет ↗</a>':(src?'<a class="link" href="'+esc(src.url)+'" target="_blank" rel="noopener noreferrer">Источник ↗</a>':'');
+      return '<article class="card"><div class="cover '+coverClass+'">'+cover+'<span class="cover-label">PS4 · DIGITAL</span><span class="cover-art" aria-hidden="true">'+esc(g.coverEmoji||'🎮')+'</span></div><div class="card-body"><span class="tag">'+esc(g.category||'Игра')+'</span><h3>'+esc(g.title||'Без названия')+'</h3><p>'+esc(g.notes||'Источник указан в карточке.')+'</p><div class="extra-actions">'+direct+'<button class="secondary" type="button" data-extra-detail="'+esc(g.id)+'">Подробнее</button></div></div></article>';
+    }).join(''):'<div class="empty">Ничего не найдено. Попробуй другое название.</div>';
+  };
+  document.getElementById('extra-sort').addEventListener('change',function(){currentSort=this.value;renderGames()});
+  document.getElementById('games').addEventListener('click',function(e){
+    var b=e.target.closest('[data-extra-detail]');if(!b)return;
+    var g=data.games.find(function(x){return String(x.id)===b.getAttribute('data-extra-detail')});if(!g)return;
+    document.getElementById('extra-details-content').innerHTML='<h2>'+esc(g.title||'Без названия')+'</h2><p>'+esc(g.notes||'Описание отсутствует.')+'</p><div class="details-grid"><div><small>Категория</small>'+esc(g.category||'—')+'</div><div><small>Title ID</small>'+esc(g.titleId||g.title_id||'—')+'</div><div><small>Версия</small>'+esc(g.version||'—')+'</div><div><small>Размер</small>'+safeSize(g.size)+'</div><div><small>Регион</small>'+esc(g.region||'—')+'</div><div><small>Релиз</small>'+esc(g.release||'—')+'</div><div><small>Минимальная прошивка</small>'+esc(g.min_fw||'—')+'</div></div>'+(g.downloadUrl?'<a class="link" href="'+esc(g.downloadUrl)+'" target="_blank" rel="noopener noreferrer">Открыть ссылку пакета ↗</a>':'<p>Прямая ссылка на пакет не указана.</p>');
+    document.getElementById('extra-details').classList.remove('hidden-extra');
+  });
+  document.getElementById('extra-close').addEventListener('click',function(){document.getElementById('extra-details').classList.add('hidden-extra')});
+  document.getElementById('remote-json-load').addEventListener('click',async function(){
+    var url=document.getElementById('remote-json-url').value.trim();if(!url)return;
+    var btn=this;btn.disabled=true;btn.textContent='Загрузка…';
+    try{var res=await fetch(url,{cache:'no-store'});if(!res.ok)throw new Error('HTTP '+res.status);var raw=await res.json();var normalized=normalize(raw);if(!normalized.games)throw new Error('bad data');data=normalized;renderSources();renderGames();setStatus(true,'Удалённый JSON-каталог загружен');}
+    catch(err){setStatus(false,'Не удалось загрузить JSON. Проверь ссылку и CORS.');}
+    finally{btn.disabled=false;btn.textContent='Загрузить каталог'}
+  });
+  document.getElementById('remote-json-reset').addEventListener('click',function(){data=originalFallback;document.getElementById('remote-json-url').value='';renderSources();renderGames();setStatus(navigator.onLine,navigator.onLine?'Интернет доступен · локальный каталог':'Нет подключения к интернету')});
+  document.getElementById('search').addEventListener('input',renderGames);
+  document.getElementById('filter').addEventListener('change',renderGames);
+  renderGames();
+})();
+</script>
 </body>
 </html>
