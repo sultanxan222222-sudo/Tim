@@ -30,6 +30,12 @@ jobs:
           cd /tmp/create-fself/cmd/create-fself
           go build -modfile=go-linux.mod -o "$GITHUB_WORKSPACE/native/ps4/tools/create-fself" .
 
+      - name: Build upstream create-gp4 utility
+        run: |
+          git clone --depth 1 https://github.com/OpenOrbis/create-gp4.git /tmp/create-gp4
+          cd /tmp/create-gp4/cmd/create-gp4
+          go build -o "$GITHUB_WORKSPACE/native/ps4/tools/create-gp4" .
+
       - name: Generate package icon on the GitHub runner
         run: python3 native/ps4/scripts/make_icon.py native/ps4/sce_sys/icon0.png
 
