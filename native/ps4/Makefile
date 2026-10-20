@@ -38,7 +38,8 @@ $(INTDIR)/%.o: $(COMMONDIR)/%.cpp | $(INTDIR)
 
 eboot.bin: $(OBJS)
 	$(LD) $(OBJS) -o $(INTDIR)/$(PROJDIR).elf $(LDFLAGS)
-	./tools/create-fself -in=$(INTDIR)/$(PROJDIR).elf -out=eboot.bin --eboot "eboot.bin" --paid 0x3800000000000011
+	./tools/create-fself -in=$(INTDIR)/$(PROJDIR).elf -out=$(INTDIR)/$(PROJDIR).oelf --eboot "eboot.bin" --paid 0x3800000000000011
+	test -s $(INTDIR)/$(PROJDIR).oelf
 	test -s eboot.bin
 
 sce_sys/icon0.png: scripts/make_icon.py
