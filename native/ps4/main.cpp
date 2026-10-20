@@ -1,6 +1,9 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <sstream>
 #include "graphics.h"
+
+std::stringstream debugLogStream;
 
 static const uint8_t FONT[][5] = {
     {0x7e,0x11,0x11,0x11,0x7e}, /* A */
