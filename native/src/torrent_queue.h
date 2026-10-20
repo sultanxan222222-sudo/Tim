@@ -12,6 +12,7 @@ typedef struct TimTorrentQueue {
 } TimTorrentQueue;
 
 void tim_torrent_queue_init(TimTorrentQueue *queue);
+/* add: index on success; -1 invalid input, -2 full, -3 duplicate URI, -4 input too long. */
 int tim_torrent_queue_add(TimTorrentQueue *queue, const char *uri, const char *name);
 int tim_torrent_queue_remove(TimTorrentQueue *queue, size_t index);
 const TimTorrentTask *tim_torrent_queue_get(const TimTorrentQueue *queue, size_t index);
