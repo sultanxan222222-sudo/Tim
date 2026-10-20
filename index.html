@@ -9,7 +9,7 @@
 :root{color-scheme:dark;--bg:#0c0f16;--panel:#151a25;--panel2:#1c2331;--text:#f3f5fa;--muted:#a7b0c1;--accent:#76a9ff;--line:#2b3445}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1b2942 0,#0c0f16 52%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
 header{padding:28px max(20px,calc((100% - 1050px)/2));border-bottom:1px solid var(--line);background:#0c0f16cc}
-.brand{font-size:clamp(25px,5vw,38px);font-weight:850;letter-spacing:-1px}.brand span{color:var(--accent)}.sub{color:var(--muted);margin-top:4px}
+.brand{font-size:clamp(25px,5vw,38px);font-weight:850;letter-spacing:-1px}.brand span{color:var(--accent)}.sub{color:var(--muted);margin-top:4px}.statusbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:14px;color:var(--muted);font-size:13px}.dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#e0ad4b}.dot.online{background:#52d68a}.dot.offline{background:#ed6969}
 main{max-width:1050px;margin:auto;padding:24px 18px 60px}.toolbar{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 20px}
 input,select{min-height:46px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);padding:10px 14px;font:inherit}input{flex:1;min-width:190px}
 h2{font-size:20px;margin:26px 0 12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px}
@@ -25,7 +25,7 @@ footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;pad
 </style>
 </head>
 <body>
-<header><div class="brand">PS4<span>-FPKGi</span></div><div class="sub">Каталог игр · поиск · источники</div></header>
+<header><div class="brand">PS4<span>-FPKGi</span></div><div class="sub">Каталог игр · поиск · источники</div><div class="statusbar"><span id="netdot" class="dot"></span><span id="netstatus">Проверяем подключение…</span><button id="refresh" type="button">Обновить каталог</button></div></header>
 <main>
 <div class="toolbar">
 <input id="search" type="search" placeholder="Найти игру…" aria-label="Поиск по играм">
@@ -49,7 +49,7 @@ const fallback={
  ]};
 let data=fallback;
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-function renderSources(){document.getElementById('sources').innerHTML=data.sources.map(s=>'<a class="source" href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.name)+'<small>'+esc(s.url)+'</small></a>').join('')}
+function setStatus(online,message){const dot=document.getElementById('netdot');dot.className='dot '+(online?'online':'offline');document.getElementById('netstatus').textContent=message}\nasync function refreshCatalog(){const btn=document.getElementById('refresh');btn.disabled=true;btn.textContent='Обновление…';try{if(!navigator.onLine)throw Error('Нет сетевого подключения');const r=await fetch('./catalog.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('Каталог недоступен: HTTP '+r.status);const d=await r.json();if(!Array.isArray(d.games)||!Array.isArray(d.sources))throw Error('Неверный формат каталога');data=d;renderSources();renderGames();setStatus(true,'Интернет доступен · каталог обновлён');}catch(e){setStatus(false,'Нет доступа к онлайн-каталогу · показаны сохранённые данные');}finally{btn.disabled=false;btn.textContent='Обновить каталог';}}\nfunction renderSources(){document.getElementById('sources').innerHTML=data.sources.map(s=>'<a class="source" href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.name)+'<small>'+esc(s.url)+'</small></a>').join('')}
 function renderGames(){
  const q=document.getElementById('search').value.trim().toLowerCase(),cat=document.getElementById('filter').value;
  const items=data.games.filter(g=>(g.title+' '+g.category+' '+(g.notes||'')).toLowerCase().includes(q)&&(cat==='all'||g.category===cat));
