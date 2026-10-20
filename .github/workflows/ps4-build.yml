@@ -1,0 +1,41 @@
+name: Build Tim PS4 PKG
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "native/ps4/**"
+      - ".github/workflows/ps4-build.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tim-ps4-build
+  cancel-in-progress: true
+
+jobs:
+  build-pkg:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build with official OpenOrbis toolchain container
+        run: |
+          docker run --rm \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            openorbisofficial/toolchain:latest \
+            bash -lc 'cd native/ps4 && make clean all'
+
+      - name: Verify package artifact exists
+        run: test -s native/ps4/IV0000-TIM000001_00-TIMCLIENT000001.pkg
+
+      - name: Upload installable package
+        uses: actions/upload-artifact@v4
+        with:
+          name: Tim-PS4-PKG
+          path: native/ps4/IV0000-TIM000001_00-TIMCLIENT000001.pkg
+          if-no-files-found: error
