@@ -1,24 +1,31 @@
 {
   "app": "TIM-PS4-PKG-Catalog",
-  "version": "0.2.1",
+  "version": "0.3.0",
   "format": "catalog.json",
+  "updated": "2026-10-20",
   "sources": [
     {
+      "id": "psprices-free",
+      "name": "PSPrices — бесплатные игры PS4",
+      "url": "https://psprices.com/region-ru/collection/free?platform=PS4",
+      "type": "discovery"
+    },
+    {
+      "id": "ps-store-free",
+      "name": "PlayStation Store — каталог бесплатных игр",
+      "url": "https://store.playstation.com/ru-ru/category/30749d2c-738f-4c36-9d6b-7ed517cca9ee/",
+      "type": "discovery"
+    },
+    {
       "id": "rocket-league",
-      "name": "Rocket League — источник каталога",
+      "name": "PlayStation Store — Rocket League",
       "url": "https://store.playstation.com/ru-ru/search/rocket%20league",
       "type": "game-search"
     },
     {
       "id": "brawlhalla",
-      "name": "Brawlhalla — источник каталога",
+      "name": "PlayStation Store — Brawlhalla",
       "url": "https://store.playstation.com/ru-ru/search/brawlhalla",
-      "type": "game-search"
-    },
-    {
-      "id": "fall-guys",
-      "name": "Fall Guys — источник каталога",
-      "url": "https://store.playstation.com/ru-ru/search/fall%20guys",
       "type": "game-search"
     }
   ],
@@ -37,7 +44,7 @@
       "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/252950/header.jpg",
       "coverEmoji": "🏎️",
       "downloadUrl": null,
-      "notes": "Карточка добавлена из предоставленного тобой источника. Прямая ссылка на PKG ещё не найдена."
+      "notes": "Открыть официальную страницу поиска игры. Прямой URL PKG не подтверждён."
     },
     {
       "id": "brawlhalla",
@@ -53,24 +60,8 @@
       "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/291550/header.jpg",
       "coverEmoji": "⚔️",
       "downloadUrl": null,
-      "notes": "Карточка добавлена из предоставленного тобой источника. Прямая ссылка на PKG ещё не найдена."
-    },
-    {
-      "id": "fall-guys",
-      "title": "Fall Guys",
-      "titleId": "",
-      "category": "Free-to-play",
-      "sourceId": "fall-guys",
-      "region": "—",
-      "version": "—",
-      "size": null,
-      "release": "",
-      "min_fw": null,
-      "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/1097150/header.jpg",
-      "coverEmoji": "🎉",
-      "downloadUrl": null,
-      "notes": "Карточка добавлена из предоставленного тобой источника. Прямая ссылка на PKG ещё не найдена."
+      "notes": "Открыть официальную страницу поиска игры. Прямой URL PKG не подтверждён."
     }
   ],
-  "note": "Search/source URLs are used to identify catalog entries; they are not direct PKG download URLs."
+  "note": "Каталоги PSPrices и PlayStation Store используются для поиска и метаданных. Страницы магазина не являются прямыми ссылками на PKG; прямые загрузки включаются только для проверенных разрешённых URL пакетов."
 }
