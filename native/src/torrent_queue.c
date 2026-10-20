@@ -12,6 +12,10 @@ void tim_torrent_queue_init(TimTorrentQueue *queue) {
     if (queue) memset(queue, 0, sizeof(*queue));
 }
 
+static int queue_is_valid(const TimTorrentQueue *queue) {
+    return queue != NULL && queue->count <= TIM_TORRENT_QUEUE_CAPACITY;
+}
+
 int tim_torrent_queue_add(TimTorrentQueue *queue, const char *uri, const char *name) {
     TimTorrentTask *task;
     size_t i;
@@ -33,7 +37,7 @@ int tim_torrent_queue_add(TimTorrentQueue *queue, const char *uri, const char *n
 }
 
 int tim_torrent_queue_remove(TimTorrentQueue *queue, size_t index) {
-    if (!queue || index >= queue->count) return -1;
+    if (!queue_is_valid(queue) || index >= queue->count) return -1;
     if (index + 1 < queue->count) {
         memmove(&queue->tasks[index], &queue->tasks[index + 1],
             (queue->count - index - 1) * sizeof(queue->tasks[0]));
@@ -44,14 +48,21 @@ int tim_torrent_queue_remove(TimTorrentQueue *queue, size_t index) {
 }
 
 const TimTorrentTask *tim_torrent_queue_get(const TimTorrentQueue *queue, size_t index) {
-    if (!queue || index >= queue->count) return NULL;
+    if (!queue_is_valid(queue) || index >= queue->count) return NULL;
     return &queue->tasks[index];
 }
 
 /* Called only by a real torrent-engine adapter; never use as fake progress. */
 int tim_torrent_queue_update(TimTorrentQueue *queue, size_t index,
     const TimTorrentTask *engine_status) {
-    if (!queue || !engine_status || index >= queue->count) return -1;
+    if (!queue_is_valid(queue) || !engine_status || index >= queue->count) return -1;
+    /* Engine adapters must provide terminated strings before status is copied. */
+    if (memchr(engine_status->source_uri, '\\0',
+            sizeof(engine_status->source_uri)) == NULL ||
+        memchr(engine_status->name, '\\0', sizeof(engine_status->name)) == NULL ||
+        memchr(engine_status->error, '\\0', sizeof(engine_status->error)) == NULL ||
+        memchr(engine_status->id, '\\0', sizeof(engine_status->id)) == NULL)
+        return -3;
     if (strcmp(queue->tasks[index].source_uri, engine_status->source_uri) != 0)
         return -2;
     queue->tasks[index] = *engine_status;
