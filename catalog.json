@@ -34,7 +34,9 @@
       "category": "Free-to-play",
       "sourceId": "rocket-league",
       "downloadUrl": null,
-      "notes": "Официальная страница поиска; прямой PKG URL не подтверждён."
+      "notes": "Официальная страница поиска; прямой PKG URL не подтверждён.",
+      "coverClass": "rocket",
+      "coverEmoji": "🏎️"
     },
     {
       "id": "brawlhalla",
@@ -42,7 +44,9 @@
       "category": "Free-to-play",
       "sourceId": "brawlhalla",
       "downloadUrl": null,
-      "notes": "Официальная страница поиска; прямой PKG URL не подтверждён."
+      "notes": "Официальная страница поиска; прямой PKG URL не подтверждён.",
+      "coverClass": "brawlhalla",
+      "coverEmoji": "⚔️"
     }
   ]
 }
