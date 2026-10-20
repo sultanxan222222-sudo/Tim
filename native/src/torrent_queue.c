@@ -57,11 +57,11 @@ int tim_torrent_queue_update(TimTorrentQueue *queue, size_t index,
     const TimTorrentTask *engine_status) {
     if (!queue_is_valid(queue) || !engine_status || index >= queue->count) return -1;
     /* Engine adapters must provide terminated strings before status is copied. */
-    if (memchr(engine_status->source_uri, '\\0',
+    if (memchr(engine_status->source_uri, '\0',
             sizeof(engine_status->source_uri)) == NULL ||
-        memchr(engine_status->name, '\\0', sizeof(engine_status->name)) == NULL ||
-        memchr(engine_status->error, '\\0', sizeof(engine_status->error)) == NULL ||
-        memchr(engine_status->id, '\\0', sizeof(engine_status->id)) == NULL)
+        memchr(engine_status->name, '\0', sizeof(engine_status->name)) == NULL ||
+        memchr(engine_status->error, '\0', sizeof(engine_status->error)) == NULL ||
+        memchr(engine_status->id, '\0', sizeof(engine_status->id)) == NULL)
         return -3;
     if (strcmp(queue->tasks[index].source_uri, engine_status->source_uri) != 0)
         return -2;
