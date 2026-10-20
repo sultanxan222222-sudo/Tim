@@ -4,29 +4,29 @@
 
 /*
  * Engine-neutral queue storage.
- * This module manages queue entries only. It intentionally does not claim to
- * download data: a real libtorrent/PS4 adapter must call update_from_engine()
- * with verified statistics from the engine.
+ * This module manages queue entries only; it does not simulate downloading.
+ * A real engine adapter must supply verified status to tim_torrent_queue_update.
  */
 
 void tim_torrent_queue_init(TimTorrentQueue *queue) {
-    if (queue) {
-        memset(queue, 0, sizeof(*queue));
-    }
+    if (queue) memset(queue, 0, sizeof(*queue));
 }
 
 int tim_torrent_queue_add(TimTorrentQueue *queue, const char *uri, const char *name) {
     TimTorrentTask *task;
     size_t i;
     if (!queue || !uri || uri[0] == '\0') return -1;
+    /* Reject overlong input rather than silently storing a truncated URI. */
+    if (strlen(uri) >= sizeof(queue->tasks[0].source_uri)) return -4;
+    if (name && strlen(name) >= sizeof(queue->tasks[0].name)) return -4;
     if (queue->count >= TIM_TORRENT_QUEUE_CAPACITY) return -2;
     for (i = 0; i < queue->count; ++i) {
         if (strcmp(queue->tasks[i].source_uri, uri) == 0) return -3;
     }
     task = &queue->tasks[queue->count];
     memset(task, 0, sizeof(*task));
-    strncpy(task->source_uri, uri, sizeof(task->source_uri) - 1);
-    if (name) strncpy(task->name, name, sizeof(task->name) - 1);
+    memcpy(task->source_uri, uri, strlen(uri) + 1);
+    if (name) memcpy(task->name, name, strlen(name) + 1);
     task->state = TIM_TORRENT_QUEUED;
     queue->count++;
     return (int)(queue->count - 1);
