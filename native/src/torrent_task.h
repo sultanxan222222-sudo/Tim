@@ -44,9 +44,9 @@ typedef struct TimTorrentTask {
 static inline unsigned int tim_torrent_progress(const TimTorrentTask *task) {
     if (task == 0 || task->total_bytes == 0) return 0;
     if (task->received_bytes >= task->total_bytes) return 100;
-    /* Avoid multiplication overflow on large torrents. */
-    return (unsigned int)((task->received_bytes / task->total_bytes) * 100u
-        + ((task->received_bytes % task->total_bytes) * 100u) / task->total_bytes);
+    /* long double avoids integer overflow for large files. */
+    return (unsigned int)(((long double)task->received_bytes * 100.0L)
+        / (long double)task->total_bytes);
 }
 
 #ifdef __cplusplus
