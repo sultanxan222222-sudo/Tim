@@ -30,6 +30,9 @@ jobs:
           cd /tmp/create-fself/cmd/create-fself
           go build -modfile=go-linux.mod -o "$GITHUB_WORKSPACE/native/ps4/tools/create-fself" .
 
+      - name: Generate package icon on the GitHub runner
+        run: python3 native/ps4/scripts/make_icon.py native/ps4/sce_sys/icon0.png
+
       - name: Build with official OpenOrbis toolchain container
         run: |
           docker run --rm --user 0 \
