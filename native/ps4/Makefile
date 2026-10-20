@@ -13,9 +13,10 @@ CC          := clang
 CCX         := clang++
 LD          := ld.lld
 
+CFILES      := ../src/torrent_queue.c ../src/torrent_engine.c
 CPPFILES    := $(wildcard *.cpp)
 COMMONFILES := $(wildcard $(COMMONDIR)/*.cpp)
-OBJS        := $(patsubst %.cpp,$(INTDIR)/%.o,$(CPPFILES)) $(patsubst $(COMMONDIR)/%.cpp,$(INTDIR)/%.o,$(COMMONFILES))
+OBJS        := $(patsubst ../src/%.c,$(INTDIR)/%.o,$(CFILES)) $(patsubst %.cpp,$(INTDIR)/%.o,$(CPPFILES)) $(patsubst $(COMMONDIR)/%.cpp,$(INTDIR)/%.o,$(COMMONFILES))
 CFLAGS      := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -c -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
 CXXFLAGS    := $(CFLAGS) -isystem $(TOOLCHAIN)/include/c++/v1
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
@@ -25,6 +26,9 @@ all: $(CONTENT_ID).pkg
 
 $(INTDIR):
 	mkdir -p $@
+
+$(INTDIR)/%.o: ../src/%.c | $(INTDIR)
+	$(CC) $(CFLAGS) -I../src -o $@ $<
 
 $(INTDIR)/%.o: %.cpp | $(INTDIR)
 	$(CCX) $(CXXFLAGS) -I$(COMMONDIR) -o $@ $<
