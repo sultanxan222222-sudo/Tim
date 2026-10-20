@@ -38,7 +38,8 @@ $(INTDIR)/%.o: $(COMMONDIR)/%.cpp | $(INTDIR)
 
 eboot.bin: $(OBJS)
 	$(LD) $(OBJS) -o $(INTDIR)/$(PROJDIR).elf $(LDFLAGS)
-	./tools/create-fself -in=$(INTDIR)/$(PROJDIR).elf -out=$(INTDIR)/$(PROJDIR).oelf --eboot "eboot.bin" --paid 0x3800000000000011
+	./tools/create-fself -in=$(INTDIR)/$(PROJDIR).elf -out=eboot.bin --eboot "eboot.bin" --paid 0x3800000000000011
+	test -s eboot.bin
 
 sce_sys/icon0.png: scripts/make_icon.py
 	mkdir -p sce_sys
@@ -59,6 +60,7 @@ sce_sys/param.sfo: Makefile
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core sfo_setentry $@ VERSION --type Utf8 --maxsize 8 --value '$(VERSION)'
 
 pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png
+	test -s eboot.bin
 	./tools/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files "$^"
 
 $(CONTENT_ID).pkg: pkg.gp4
