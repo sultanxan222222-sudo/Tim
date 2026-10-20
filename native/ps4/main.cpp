@@ -80,11 +80,11 @@ static void draw_text(Scene2D *s, const char *text, int x, int y,
 
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
-    Scene2D scene(1920, 1080, 4);
-    if (!scene.Init(0xC000000, 2)) {
+    Scene2D *scene = new Scene2D(1920, 1080, 4);
+    if (!scene->Init(0xC000000, 2)) {
         for (;;) sceKernelUsleep(1000000);
     }
-    scene.SetActiveFrameBuffer(0);
+    scene->SetActiveFrameBuffer(0);
 
     const Color white = rgb(235, 242, 255);
     const Color muted = rgb(135, 157, 183);
@@ -94,8 +94,8 @@ int main() {
 
     int frame = 0;
     for (;;) {
-        scene.FrameBufferClear();
-        rectangle(&scene, 0, 0, 1920, 1080, 8, 14, 25);
+        scene->FrameBufferClear();
+        rectangle(scene, 0, 0, 1920, 1080, 8, 14, 25);
         rectangle(&scene, 0, 0, 1920, 12, 50, 220, 220);
         rectangle(&scene, 120, 110, 1680, 220, 20, 33, 52);
         rectangle(&scene, 120, 365, 810, 270, 20, 33, 52);
@@ -103,7 +103,7 @@ int main() {
         rectangle(&scene, 120, 670, 1680, 230, 20, 33, 52);
         rectangle(&scene, 120, 110, 12, 220, 50, 220, 220);
 
-        draw_text(&scene, "TIM", 170, 150, 10, cyan);
+        draw_text(scene, "TIM", 170, 150, 10, cyan);
         draw_text(&scene, "PS4 DOWNLOAD MANAGER", 430, 175, 4, white);
         draw_text(&scene, "NATIVE UI TEST BUILD", 430, 230, 3, muted);
 
@@ -118,9 +118,9 @@ int main() {
         draw_text(&scene, "NEXT: CONNECT LIBRARY AND CATALOG", 165, 725, 4, white);
         draw_text(&scene, "THIS BUILD DOES NOT DOWNLOAD FILES", 165, 800, 3, muted);
 
-        scene.SubmitFlip(frame);
-        scene.FrameWait(frame);
-        scene.FrameBufferSwap();
+        scene->SubmitFlip(frame);
+        scene->FrameWait(frame);
+        scene->FrameBufferSwap();
         ++frame;
     }
     return 0;
