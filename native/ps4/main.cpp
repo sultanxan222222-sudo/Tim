@@ -87,7 +87,6 @@ int main() {
      * consoles with a tighter direct-memory budget.
      */
     if (!scene->Init(0x1200000, 2)) {
-        sceKernelExitProcess(1);
         return 1;
     }
     scene->SetActiveFrameBuffer(0);
