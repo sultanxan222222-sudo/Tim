@@ -136,10 +136,37 @@ static void test_reject_mismatched_backend_uri_and_poll_errors(void) {
     tim_torrent_engine_shutdown(&engine);
 }
 
+
+static void test_active_handle_survives_queue_reordering(void) {
+    TimTorrentEngine engine;
+    TimTorrentQueue queue;
+    FakeBackend fake;
+    TimTorrentBackend backend;
+
+    memset(&fake, 0, sizeof(fake));
+    tim_torrent_queue_init(&queue);
+    assert(tim_torrent_queue_add(&queue, "magnet:?xt=urn:btih:first", "first") == 0);
+    assert(tim_torrent_queue_add(&queue, "magnet:?xt=urn:btih:second", "second") == 1);
+    backend = make_backend(&fake);
+    assert(tim_torrent_engine_init(&engine, &queue, &backend) == TIM_ENGINE_OK);
+    assert(tim_torrent_engine_start(&engine, 1, "/tmp/tim-test") == TIM_ENGINE_OK);
+
+    /* Removing an earlier queue entry must not detach the active handle. */
+    assert(tim_torrent_queue_remove(&queue, 0) == 0);
+    fake.status.received_bytes = 250;
+    assert(tim_torrent_engine_poll(&engine, 0) == TIM_ENGINE_OK);
+    assert(strcmp(tim_torrent_queue_get(&queue, 0)->source_uri,
+                  "magnet:?xt=urn:btih:second") == 0);
+    assert(tim_torrent_queue_get(&queue, 0)->received_bytes == 250);
+    assert(tim_torrent_engine_cancel(&engine, 0) == TIM_ENGINE_OK);
+    tim_torrent_engine_shutdown(&engine);
+}
+
 int main(void) {
     test_no_backend_is_explicit();
     test_lifecycle_and_real_status_contract();
     test_reject_mismatched_backend_uri_and_poll_errors();
+    test_active_handle_survives_queue_reordering();
     puts("All torrent engine contract tests passed (fake backend; no network download).");
     return 0;
 }
