@@ -16,14 +16,20 @@
     },
     {
       "id": "rocket-league",
-      "name": "Rocket League",
+      "name": "Rocket League — PlayStation Store",
       "url": "https://store.playstation.com/ru-ru/search/rocket%20league",
       "type": "search"
     },
     {
       "id": "brawlhalla",
-      "name": "Brawlhalla",
+      "name": "Brawlhalla — PlayStation Store",
       "url": "https://store.playstation.com/ru-ru/search/brawlhalla",
+      "type": "search"
+    },
+    {
+      "id": "fall-guys",
+      "name": "Fall Guys — PlayStation Store",
+      "url": "https://store.playstation.com/ru-ru/search/fall%20guys",
       "type": "search"
     }
   ],
@@ -49,6 +55,17 @@
       "coverClass": "brawlhalla",
       "coverEmoji": "⚔️",
       "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/291550/header.jpg"
+    },
+    {
+      "id": "fall-guys",
+      "title": "Fall Guys",
+      "category": "Free-to-play",
+      "sourceId": "fall-guys",
+      "downloadUrl": null,
+      "notes": "Официальная страница поиска PlayStation Store; карточка каталога добавлена, прямой PKG URL не подтверждён.",
+      "coverClass": "fall-guys",
+      "coverEmoji": "🎉",
+      "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/1097150/header.jpg"
     }
   ]
 }
