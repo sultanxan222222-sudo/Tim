@@ -65,4 +65,4 @@ $(CONTENT_ID).pkg: pkg.gp4
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
 
 clean:
-	rm -rf $(INTDIR) sce_sys/param.sfo sce_sys/icon0.png eboot.bin pkg.gp4 $(CONTENT_ID).pkg
+	rm -rf $(INTDIR) sce_sys/param.sfo eboot.bin pkg.gp4 $(CONTENT_ID).pkg
