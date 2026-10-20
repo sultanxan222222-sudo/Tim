@@ -1,4 +1,4 @@
-name: Publish PS4 catalog
+name: Validate PS4 catalog
 
 on:
   push:
@@ -7,11 +7,9 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: pages
+  group: catalog-validation
   cancel-in-progress: true
 
 jobs:
@@ -20,26 +18,18 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Validate catalog JSON
         run: python -m json.tool catalog.json > /dev/null
+
       - name: Verify required files
         run: test -s index.html && test -s catalog.json
 
-  deploy:
-    needs: validate
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-      - name: Upload site
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload catalog prototype
+        uses: actions/upload-artifact@v4
         with:
-          path: .
-      - name: Deploy site
-        id: deployment
-        uses: actions/deploy-pages@v4
+          name: tim-catalog-prototype
+          path: |
+            index.html
+            catalog.json
+          if-no-files-found: error
