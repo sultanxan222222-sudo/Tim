@@ -84,6 +84,7 @@ int main() {
     if (!scene.Init(0xC000000, 2)) {
         for (;;) sceKernelUsleep(1000000);
     }
+    scene.SetActiveFrameBuffer(0);
 
     const Color white = rgb(235, 242, 255);
     const Color muted = rgb(135, 157, 183);
