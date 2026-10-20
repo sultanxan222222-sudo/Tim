@@ -19,7 +19,7 @@ static int queue_is_valid(const TimTorrentQueue *queue) {
 int tim_torrent_queue_add(TimTorrentQueue *queue, const char *uri, const char *name) {
     TimTorrentTask *task;
     size_t i;
-    if (!queue || !uri || uri[0] == '\0') return -1;
+    if (!queue_is_valid(queue) || !uri || uri[0] == '\0') return -1;
     /* Reject overlong input rather than silently storing a truncated URI. */
     if (strlen(uri) >= sizeof(queue->tasks[0].source_uri)) return -4;
     if (name && strlen(name) >= sizeof(queue->tasks[0].name)) return -4;
