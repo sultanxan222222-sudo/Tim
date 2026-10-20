@@ -36,7 +36,8 @@
       "downloadUrl": null,
       "notes": "Официальная страница поиска; прямой PKG URL не подтверждён.",
       "coverClass": "rocket",
-      "coverEmoji": "🏎️"
+      "coverEmoji": "🏎️",
+      "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/252950/header.jpg"
     },
     {
       "id": "brawlhalla",
@@ -46,7 +47,8 @@
       "downloadUrl": null,
       "notes": "Официальная страница поиска; прямой PKG URL не подтверждён.",
       "coverClass": "brawlhalla",
-      "coverEmoji": "⚔️"
+      "coverEmoji": "⚔️",
+      "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/291550/header.jpg"
     }
   ]
 }
