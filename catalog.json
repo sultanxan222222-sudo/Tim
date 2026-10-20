@@ -1,0 +1,48 @@
+{
+  "app": "PS4-FPKGi",
+  "version": "0.1.0",
+  "sources": [
+    {
+      "id": "psprices-free",
+      "name": "PSPrices — бесплатные игры PS4",
+      "url": "https://psprices.com/region-ru/collection/free?platform=PS4",
+      "type": "catalog"
+    },
+    {
+      "id": "store-category",
+      "name": "PlayStation Store — каталог",
+      "url": "https://store.playstation.com/ru-ru/category/30749d2c-738f-4c36-9d6b-7ed517cca9ee/",
+      "type": "catalog"
+    },
+    {
+      "id": "rocket-league",
+      "name": "Rocket League",
+      "url": "https://store.playstation.com/ru-ru/search/rocket%20league",
+      "type": "search"
+    },
+    {
+      "id": "brawlhalla",
+      "name": "Brawlhalla",
+      "url": "https://store.playstation.com/ru-ru/search/brawlhalla",
+      "type": "search"
+    }
+  ],
+  "games": [
+    {
+      "id": "rocket-league",
+      "title": "Rocket League",
+      "category": "Free-to-play",
+      "sourceId": "rocket-league",
+      "downloadUrl": null,
+      "notes": "Официальная страница поиска; прямой PKG URL не подтверждён."
+    },
+    {
+      "id": "brawlhalla",
+      "title": "Brawlhalla",
+      "category": "Free-to-play",
+      "sourceId": "brawlhalla",
+      "downloadUrl": null,
+      "notes": "Официальная страница поиска; прямой PKG URL не подтверждён."
+    }
+  ]
+}
