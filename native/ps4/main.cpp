@@ -89,34 +89,32 @@ int main() {
     const Color white = rgb(235, 242, 255);
     const Color muted = rgb(135, 157, 183);
     const Color cyan = rgb(50, 220, 220);
-    const Color panel = rgb(20, 33, 52);
-    const Color dark = rgb(8, 14, 25);
 
     int frame = 0;
     for (;;) {
         scene->FrameBufferClear();
         rectangle(scene, 0, 0, 1920, 1080, 8, 14, 25);
-        rectangle(&scene, 0, 0, 1920, 12, 50, 220, 220);
-        rectangle(&scene, 120, 110, 1680, 220, 20, 33, 52);
-        rectangle(&scene, 120, 365, 810, 270, 20, 33, 52);
-        rectangle(&scene, 970, 365, 830, 270, 20, 33, 52);
-        rectangle(&scene, 120, 670, 1680, 230, 20, 33, 52);
-        rectangle(&scene, 120, 110, 12, 220, 50, 220, 220);
+        rectangle(scene, 0, 0, 1920, 12, 50, 220, 220);
+        rectangle(scene, 120, 110, 1680, 220, 20, 33, 52);
+        rectangle(scene, 120, 365, 810, 270, 20, 33, 52);
+        rectangle(scene, 970, 365, 830, 270, 20, 33, 52);
+        rectangle(scene, 120, 670, 1680, 230, 20, 33, 52);
+        rectangle(scene, 120, 110, 12, 220, 50, 220, 220);
 
         draw_text(scene, "TIM", 170, 150, 10, cyan);
-        draw_text(&scene, "PS4 DOWNLOAD MANAGER", 430, 175, 4, white);
-        draw_text(&scene, "NATIVE UI TEST BUILD", 430, 230, 3, muted);
+        draw_text(scene, "PS4 DOWNLOAD MANAGER", 430, 175, 4, white);
+        draw_text(scene, "NATIVE UI TEST BUILD", 430, 230, 3, muted);
 
-        draw_text(&scene, "QUEUE", 165, 405, 5, cyan);
-        draw_text(&scene, "READY", 165, 485, 5, white);
-        draw_text(&scene, "0 ACTIVE TASKS", 165, 555, 3, muted);
+        draw_text(scene, "QUEUE", 165, 405, 5, cyan);
+        draw_text(scene, "READY", 165, 485, 5, white);
+        draw_text(scene, "0 ACTIVE TASKS", 165, 555, 3, muted);
 
-        draw_text(&scene, "TORRENT ENGINE", 1015, 405, 4, cyan);
-        draw_text(&scene, "NOT CONNECTED", 1015, 485, 4, white);
-        draw_text(&scene, "REAL BACKEND REQUIRED", 1015, 555, 3, muted);
+        draw_text(scene, "TORRENT ENGINE", 1015, 405, 4, cyan);
+        draw_text(scene, "NOT CONNECTED", 1015, 485, 4, white);
+        draw_text(scene, "REAL BACKEND REQUIRED", 1015, 555, 3, muted);
 
-        draw_text(&scene, "NEXT: CONNECT LIBRARY AND CATALOG", 165, 725, 4, white);
-        draw_text(&scene, "THIS BUILD DOES NOT DOWNLOAD FILES", 165, 800, 3, muted);
+        draw_text(scene, "NEXT: CONNECT LIBRARY AND CATALOG", 165, 725, 4, white);
+        draw_text(scene, "THIS BUILD DOES NOT DOWNLOAD FILES", 165, 800, 3, muted);
 
         scene->SubmitFlip(frame);
         scene->FrameWait(frame);
