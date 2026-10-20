@@ -1,4 +1,5 @@
 #include <stdint.h>
+#include <stdio.h>
 #include "graphics.h"
 
 static const uint8_t FONT[][5] = {
