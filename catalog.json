@@ -1,38 +1,14 @@
 {
   "app": "TIM-PS4-PKG-Catalog",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "format": "catalog.json",
   "updated": "2026-10-20",
   "sources": [
     {
-      "id": "psprices-free",
-      "name": "PSPrices — бесплатные игры PS4",
-      "url": "https://psprices.com/region-ru/collection/free?platform=PS4",
-      "type": "discovery"
-    },
-    {
-      "id": "ps-store-free",
-      "name": "PlayStation Store — каталог бесплатных игр",
-      "url": "https://store.playstation.com/ru-ru/category/30749d2c-738f-4c36-9d6b-7ed517cca9ee/",
-      "type": "discovery"
-    },
-    {
       "id": "pirategames-ps4",
       "name": "PirateGames — каталог PS4",
       "url": "https://pirategames.ru/ps4/",
-      "type": "metadata-discovery"
-    },
-    {
-      "id": "rocket-league",
-      "name": "PlayStation Store — Rocket League",
-      "url": "https://store.playstation.com/ru-ru/search/rocket%20league",
-      "type": "game-search"
-    },
-    {
-      "id": "brawlhalla",
-      "name": "PlayStation Store — Brawlhalla",
-      "url": "https://store.playstation.com/ru-ru/search/brawlhalla",
-      "type": "game-search"
+      "type": "catalog"
     }
   ],
   "games": [
@@ -41,7 +17,6 @@
       "title": "Rocket League",
       "titleId": "",
       "category": "Free-to-play",
-      "sourceId": "rocket-league",
       "region": "—",
       "version": "—",
       "size": null,
@@ -50,14 +25,13 @@
       "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/252950/header.jpg",
       "coverEmoji": "🏎️",
       "downloadUrl": null,
-      "notes": "Открыть официальную страницу поиска игры. Прямой URL PKG не подтверждён."
+      "notes": "Карточка-заготовка. Источник прямого PKG пока не подключён."
     },
     {
       "id": "brawlhalla",
       "title": "Brawlhalla",
       "titleId": "",
       "category": "Free-to-play",
-      "sourceId": "brawlhalla",
       "region": "—",
       "version": "—",
       "size": null,
@@ -66,8 +40,8 @@
       "coverImage": "https://cdn.cloudflare.steamstatic.com/steam/apps/291550/header.jpg",
       "coverEmoji": "⚔️",
       "downloadUrl": null,
-      "notes": "Открыть официальную страницу поиска игры. Прямой URL PKG не подтверждён."
+      "notes": "Карточка-заготовка. Источник прямого PKG пока не подключён."
     }
   ],
-  "note": "Источники поиска и метаданных не являются прямыми ссылками на PKG. Прямые загрузки следует подключать только для пакетов, которые разрешено распространять или которыми владеешь."
+  "note": "PirateGames — единственный источник каталога в списке. Страница каталога сама по себе не является прямым URL PKG; для скачивания нужны проверенные прямые ссылки на файлы."
 }
