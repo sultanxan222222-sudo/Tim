@@ -11,10 +11,6 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: tim-ps4-build
-  cancel-in-progress: true
-
 jobs:
   build-pkg:
     runs-on: ubuntu-latest
