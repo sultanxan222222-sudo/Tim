@@ -18,6 +18,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Go for the OpenOrbis ELF wrapper
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Build upstream create-fself utility
+        run: |
+          git clone --depth 1 https://github.com/OpenOrbis/create-fself.git /tmp/create-fself
+          mkdir -p native/ps4/tools
+          cd /tmp/create-fself/cmd/create-fself
+          go build -modfile=go-linux.mod -o "$GITHUB_WORKSPACE/native/ps4/tools/create-fself" .
+
       - name: Build with official OpenOrbis toolchain container
         run: |
           docker run --rm --user 0 \
