@@ -24,7 +24,7 @@ jobs:
 
       - name: Build with official OpenOrbis toolchain container
         run: |
-          docker run --rm \
+          docker run --rm --user 0 \
             -v "$PWD:/workspace" \
             -w /workspace \
             openorbisofficial/toolchain:latest \
