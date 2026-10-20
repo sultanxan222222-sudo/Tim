@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#10131c">
+<title>PS4-FPKGi — Каталог</title>
+<style>
+:root{color-scheme:dark;--bg:#0c0f16;--panel:#151a25;--panel2:#1c2331;--text:#f3f5fa;--muted:#a7b0c1;--accent:#76a9ff;--line:#2b3445}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#1b2942 0,#0c0f16 52%);color:var(--text);font:16px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+header{padding:28px max(20px,calc((100% - 1050px)/2));border-bottom:1px solid var(--line);background:#0c0f16cc}
+.brand{font-size:clamp(25px,5vw,38px);font-weight:850;letter-spacing:-1px}.brand span{color:var(--accent)}.sub{color:var(--muted);margin-top:4px}
+main{max-width:1050px;margin:auto;padding:24px 18px 60px}.toolbar{display:flex;gap:12px;flex-wrap:wrap;margin:0 0 20px}
+input,select{min-height:46px;border:1px solid var(--line);border-radius:12px;background:var(--panel);color:var(--text);padding:10px 14px;font:inherit}input{flex:1;min-width:190px}
+h2{font-size:20px;margin:26px 0 12px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:14px}
+.card{background:linear-gradient(145deg,var(--panel),#11151e);border:1px solid var(--line);border-radius:16px;padding:18px;display:flex;flex-direction:column;min-height:190px}
+.tag{font-size:12px;color:#bcd3ff;background:#243653;border-radius:999px;padding:4px 9px;align-self:flex-start}
+.card h3{margin:12px 0 6px;font-size:19px}.card p{margin:0 0 16px;color:var(--muted);font-size:14px;flex:1}
+a.link,button{display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;background:#2c4d80;color:white;border:0;border-radius:10px;padding:10px 13px;font-weight:650;cursor:pointer}
+a.link:hover,button:hover{background:#3964a3}.sources{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:10px}
+.source{display:block;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;color:var(--text);text-decoration:none}.source small{display:block;color:var(--muted);margin-top:5px;overflow-wrap:anywhere}
+.notice{border:1px solid #594a2a;background:#292317;color:#e9d7a9;padding:14px;border-radius:12px;margin-top:22px;font-size:14px}
+.empty{color:var(--muted);padding:22px;border:1px dashed var(--line);border-radius:12px;grid-column:1/-1}
+footer{border-top:1px solid var(--line);color:var(--muted);text-align:center;padding:20px;font-size:13px}
+</style>
+</head>
+<body>
+<header><div class="brand">PS4<span>-FPKGi</span></div><div class="sub">Каталог игр · поиск · источники</div></header>
+<main>
+<div class="toolbar">
+<input id="search" type="search" placeholder="Найти игру…" aria-label="Поиск по играм">
+<select id="filter" aria-label="Фильтр категории"><option value="all">Все категории</option><option value="Free-to-play">Free-to-play</option></select>
+</div>
+<h2>Игры</h2><section id="games" class="grid" aria-live="polite"><div class="empty">Загрузка каталога…</div></section>
+<h2>Источники каталога</h2><section id="sources" class="sources"></section>
+<div class="notice"><strong>Важно:</strong> ссылка на страницу магазина не является прямой ссылкой на PKG. Прямые загрузки появятся только для пакетов, которые разрешено распространять и для которых подтверждён источник.</div>
+</main>
+<footer>PS4-FPKGi · прототип каталога 0.1.0</footer>
+<script>
+const fallback={
+ "sources":[
+  {"id":"psprices-free","name":"PSPrices — бесплатные игры PS4","url":"https://psprices.com/region-ru/collection/free?platform=PS4","type":"catalog"},
+  {"id":"store-category","name":"PlayStation Store — каталог","url":"https://store.playstation.com/ru-ru/category/30749d2c-738f-4c36-9d6b-7ed517cca9ee/","type":"catalog"},
+  {"id":"rocket-league","name":"Rocket League","url":"https://store.playstation.com/ru-ru/search/rocket%20league","type":"search"},
+  {"id":"brawlhalla","name":"Brawlhalla","url":"https://store.playstation.com/ru-ru/search/brawlhalla","type":"search"}],
+ "games":[
+  {"id":"rocket-league","title":"Rocket League","category":"Free-to-play","sourceId":"rocket-league","downloadUrl":null,"notes":"Официальная страница поиска; прямой PKG URL не подтверждён."},
+  {"id":"brawlhalla","title":"Brawlhalla","category":"Free-to-play","sourceId":"brawlhalla","downloadUrl":null,"notes":"Официальная страница поиска; прямой PKG URL не подтверждён."}
+ ]};
+let data=fallback;
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+function renderSources(){document.getElementById('sources').innerHTML=data.sources.map(s=>'<a class="source" href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">'+esc(s.name)+'<small>'+esc(s.url)+'</small></a>').join('')}
+function renderGames(){
+ const q=document.getElementById('search').value.trim().toLowerCase(),cat=document.getElementById('filter').value;
+ const items=data.games.filter(g=>(g.title+' '+g.category+' '+(g.notes||'')).toLowerCase().includes(q)&&(cat==='all'||g.category===cat));
+ document.getElementById('games').innerHTML=items.length?items.map(g=>{
+  const s=data.sources.find(x=>x.id===g.sourceId);
+  const action=g.downloadUrl?'<a class="link" href="'+esc(g.downloadUrl)+'" target="_blank" rel="noopener noreferrer">Открыть загрузку</a>':s?'<a class="link" href="'+esc(s.url)+'" target="_blank" rel="noopener noreferrer">Открыть источник ↗</a>':'';
+  return '<article class="card"><span class="tag">'+esc(g.category||'Игра')+'</span><h3>'+esc(g.title)+'</h3><p>'+esc(g.notes||'Источник указан в карточке игры.')+'</p>'+action+'</article>'
+ }).join(''):'<div class="empty">Ничего не найдено. Попробуй другое название.</div>';
+}
+document.getElementById('search').addEventListener('input',renderGames);
+document.getElementById('filter').addEventListener('change',renderGames);
+renderSources();renderGames();
+fetch('./catalog.json').then(r=>{if(!r.ok)throw Error('catalog unavailable');return r.json()}).then(d=>{if(d&&Array.isArray(d.games)&&Array.isArray(d.sources)){data=d;renderSources();renderGames()}}).catch(()=>{});
+</script>
+</body>
+</html>
