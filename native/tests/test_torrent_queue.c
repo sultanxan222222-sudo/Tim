@@ -55,6 +55,8 @@ static void test_update_requires_matching_uri(void) {
     strcpy(status.source_uri, "magnet:?xt=urn:btih:other");
     status.state = TIM_TORRENT_DOWNLOADING;
     assert(tim_torrent_queue_update(&q, 0, &status) == -2);
+    memset(status.source_uri, 'x', sizeof(status.source_uri));
+    assert(tim_torrent_queue_update(&q, 0, &status) == -3);
     strcpy(status.source_uri, "magnet:?xt=urn:btih:test");
     status.received_bytes = 50;
     status.total_bytes = 100;
@@ -64,6 +66,15 @@ static void test_update_requires_matching_uri(void) {
     assert(task->state == TIM_TORRENT_DOWNLOADING);
     assert(tim_torrent_progress(task) == 50);
     assert(tim_torrent_queue_update(&q, 4, &status) == -1);
+}
+
+static void test_corrupt_queue_count_is_rejected(void) {
+    TimTorrentQueue q;
+    tim_torrent_queue_init(&q);
+    q.count = TIM_TORRENT_QUEUE_CAPACITY + 1;
+    assert(tim_torrent_queue_add(&q, "uri:unsafe", "unsafe") == -1);
+    assert(tim_torrent_queue_get(&q, 0) == NULL);
+    assert(tim_torrent_queue_remove(&q, 0) == -1);
 }
 
 static void test_capacity(void) {
@@ -99,6 +110,7 @@ int main(void) {
     test_remove_and_compact();
     test_update_requires_matching_uri();
     test_capacity();
+    test_corrupt_queue_count_is_rejected();
     test_progress_edges();
     puts("All torrent queue tests passed.");
     return 0;
