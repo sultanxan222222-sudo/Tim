@@ -36,6 +36,7 @@ typedef struct TimTorrentBackend {
 
 typedef struct TimEngineItem {
     void *handle;
+    char source_uri[2048];
     int active;
 } TimEngineItem;
 
