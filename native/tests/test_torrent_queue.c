@@ -14,12 +14,20 @@ static void test_init_and_add(void) {
     assert(tim_torrent_queue_get(&q, 0)->state == TIM_TORRENT_QUEUED);
 }
 
-static void test_reject_invalid_and_duplicate(void) {
+static void test_reject_invalid_duplicate_and_overlong(void) {
     TimTorrentQueue q;
+    char long_uri[sizeof(((TimTorrentTask *)0)->source_uri) + 1];
+    char long_name[sizeof(((TimTorrentTask *)0)->name) + 1];
     tim_torrent_queue_init(&q);
+    memset(long_uri, 'u', sizeof(long_uri) - 1);
+    long_uri[sizeof(long_uri) - 1] = '\0';
+    memset(long_name, 'n', sizeof(long_name) - 1);
+    long_name[sizeof(long_name) - 1] = '\0';
     assert(tim_torrent_queue_add(NULL, "magnet:?x", "x") == -1);
     assert(tim_torrent_queue_add(&q, NULL, "x") == -1);
     assert(tim_torrent_queue_add(&q, "", "x") == -1);
+    assert(tim_torrent_queue_add(&q, long_uri, "x") == -4);
+    assert(tim_torrent_queue_add(&q, "uri:valid", long_name) == -4);
     assert(tim_torrent_queue_add(&q, "magnet:?x", "first") == 0);
     assert(tim_torrent_queue_add(&q, "magnet:?x", "duplicate") == -3);
     assert(q.count == 1);
@@ -87,7 +95,7 @@ static void test_progress_edges(void) {
 
 int main(void) {
     test_init_and_add();
-    test_reject_invalid_and_duplicate();
+    test_reject_invalid_duplicate_and_overlong();
     test_remove_and_compact();
     test_update_requires_matching_uri();
     test_capacity();
