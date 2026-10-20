@@ -1,4 +1,4 @@
-#include "torrent_task.h"
+#include "torrent_queue.h"
 #include <stddef.h>
 #include <string.h>
 
@@ -8,13 +8,6 @@
  * download data: a real libtorrent/PS4 adapter must call update_from_engine()
  * with verified statistics from the engine.
  */
-
-#define TIM_TORRENT_QUEUE_CAPACITY 32
-
-typedef struct TimTorrentQueue {
-    TimTorrentTask tasks[TIM_TORRENT_QUEUE_CAPACITY];
-    size_t count;
-} TimTorrentQueue;
 
 void tim_torrent_queue_init(TimTorrentQueue *queue) {
     if (queue) {
