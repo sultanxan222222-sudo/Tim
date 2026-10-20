@@ -8,6 +8,9 @@
 #include "graphics.h"
 #include "log.h"
 
+// Single translation-unit definition for the shared logger stream.
+std::stringstream debugLogStream;
+
 Scene2D::Scene2D(int w, int h, int pixelDepth)
 {
 	this->width = w;
