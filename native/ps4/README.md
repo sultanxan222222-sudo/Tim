@@ -5,7 +5,6 @@ This directory is the native PS4 build boundary for Tim. It intentionally does n
 ## Toolchain
 
 - Official toolchain: https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain
-- GitHub Actions helper: https://github.com/OpenOrbis/toolchain-action
 - Build examples: https://github.com/OpenOrbis/OpenOrbis-PS4-Toolchain/tree/master/samples/hello_world
 
 The package build requires the toolchain's compiler/linker and packaging utilities, plus valid `sce_sys` metadata/assets and runtime modules. Do not replace missing assets with empty files and do not rename an ELF/HTML file to `.pkg`.
@@ -21,4 +20,4 @@ The package build requires the toolchain's compiler/linker and packaging utiliti
 
 ## Download engine
 
-Torrent progress must be supplied by a real engine status callback. The current queue is only state storage; it is not a downloader. Start integration with an explicitly authorized test torrent and verify piece hashes, pause/resume, storage errors and completion before connecting any catalog entries.
+The C adapter contract in `../src/torrent_engine.h` exposes start, pause, resume, cancel and polling. It is intentionally backend-neutral; it is not itself a torrent implementation. A real backend must provide the library calls and real transfer statistics. The host-side fake backend tests validate the interface and queue synchronization only, not network downloading or PS4 compatibility.
