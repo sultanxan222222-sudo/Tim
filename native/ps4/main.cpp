@@ -81,8 +81,14 @@ static void draw_text(Scene2D *s, const char *text, int x, int y,
 int main() {
     setvbuf(stdout, NULL, _IONBF, 0);
     Scene2D *scene = new Scene2D(1920, 1080, 4);
-    if (!scene->Init(0xC000000, 2)) {
-        for (;;) sceKernelUsleep(1000000);
+    /*
+     * Two 1920x1080 32-bit framebuffers need about 16 MiB.
+     * The previous 192 MiB reservation was unnecessary and could fail on
+     * consoles with a tighter direct-memory budget.
+     */
+    if (!scene->Init(0x1200000, 2)) {
+        sceKernelExitProcess(1);
+        return 1;
     }
     scene->SetActiveFrameBuffer(0);
 
