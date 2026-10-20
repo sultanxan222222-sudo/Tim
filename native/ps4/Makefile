@@ -13,9 +13,9 @@ CC          := clang
 CCX         := clang++
 LD          := ld.lld
 
-CPPFILES    := $(wildcard $(PROJDIR)/*.cpp)
+CPPFILES    := $(wildcard *.cpp)
 COMMONFILES := $(wildcard $(COMMONDIR)/*.cpp)
-OBJS        := $(patsubst $(PROJDIR)/%.cpp,$(INTDIR)/%.o,$(CPPFILES)) $(patsubst $(COMMONDIR)/%.cpp,$(INTDIR)/%.o,$(COMMONFILES))
+OBJS        := $(patsubst %.cpp,$(INTDIR)/%.o,$(CPPFILES)) $(patsubst $(COMMONDIR)/%.cpp,$(INTDIR)/%.o,$(COMMONFILES))
 CFLAGS      := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -c -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
 CXXFLAGS    := $(CFLAGS) -isystem $(TOOLCHAIN)/include/c++/v1
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
@@ -26,7 +26,7 @@ all: $(CONTENT_ID).pkg
 $(INTDIR):
 	mkdir -p $@
 
-$(INTDIR)/%.o: $(PROJDIR)/%.cpp | $(INTDIR)
+$(INTDIR)/%.o: %.cpp | $(INTDIR)
 	$(CCX) $(CXXFLAGS) -I$(COMMONDIR) -o $@ $<
 
 $(INTDIR)/%.o: $(COMMONDIR)/%.cpp | $(INTDIR)
@@ -61,4 +61,4 @@ $(CONTENT_ID).pkg: pkg.gp4
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
 
 clean:
-	rm -rf $(PROJDIR) sce_sys/param.sfo sce_sys/icon0.png eboot.bin pkg.gp4 $(CONTENT_ID).pkg
+	rm -rf $(INTDIR) sce_sys/param.sfo sce_sys/icon0.png eboot.bin pkg.gp4 $(CONTENT_ID).pkg
