@@ -11,28 +11,22 @@ main{max-width:1180px;margin:auto;padding:22px 16px 55px}.toolbar,.remote-contro
 </style>
 </head>
 <body>
-<header><div class="brand">TIM<span> · PS4</span></div><div class="sub">Каталог карточками · поиск · удалённые JSON-источники</div><div class="status"><span id="dot" class="dot"></span><span id="status">Загрузка каталога…</span><button id="refresh">Обновить каталог</button></div></header>
+<header><div class="brand">TIM<span> · PS4</span></div><div class="sub">Каталог PKG · карточки · поиск · прямые ссылки на пакеты</div><div class="status"><span id="dot" class="dot"></span><span id="status">Загрузка каталога…</span><button id="refresh">Обновить каталог</button></div></header>
 <main>
-<section class="remote"><strong>Подключить совместимый JSON-каталог</strong><div class="remote-controls" style="margin:10px 0 0"><input id="remoteUrl" type="url" placeholder="https://example.org/catalog.json" aria-label="URL каталога"><button id="loadRemote">Подключить</button><button id="reset" class="secondary">Мой каталог</button></div><small>Поддерживаются catalog.json проекта и формат FPKGi DATA. Для стороннего сервера может потребоваться разрешение CORS.</small></section>
+<section class="remote"><strong>Подключить каталог PKG</strong><div class="remote-controls" style="margin:10px 0 0"><input id="remoteUrl" type="url" placeholder="URL JSON-каталога FPKGi DATA" aria-label="URL каталога PKG"><button id="loadRemote">Подключить</button><button id="reset" class="secondary">Мой каталог</button></div><small>Поддерживаются JSON проекта и формат FPKGi DATA. В каталоге должны быть прямые URL на PKG и метаданные. Источник должен разрешать доступ к JSON (CORS).</small></section>
 <div class="toolbar"><input id="search" type="search" placeholder="Название, Title ID, регион…" aria-label="Поиск"><select id="category" aria-label="Категория"><option value="">Все категории</option><option>Games</option><option>Free-to-play</option><option>Apps</option><option>Homebrew</option><option>DLC</option><option>Demos</option><option>Updates</option></select><select id="sort" aria-label="Сортировка"><option value="name">Название А–Я</option><option value="name-desc">Название Я–А</option><option value="size">Размер: меньше сначала</option><option value="size-desc">Размер: больше сначала</option><option value="region">Регион</option></select></div>
 <h2 id="count">Каталог игр</h2><section id="games" class="grid" aria-live="polite"><div class="empty">Загрузка…</div></section>
-<h2>Источники информации</h2><section id="sources" class="sources"></section>
-<div class="notice"><strong>Важно:</strong> страницы PlayStation Store и PSPrices помогают найти сведения об играх, но не являются прямыми ссылками на PKG. Кнопка пакета показывается только при наличии URL в подключённом каталоге. Используй пакеты, которые разрешено распространять или которыми владеешь.</div>
+<h2>Источники каталогов PKG</h2><section id="sources" class="sources"></section>
+<div class="notice"><strong>Важно:</strong> приложение не содержит встроенного каталога с выдуманными ссылками. Подключи совместимый JSON-каталог, в котором есть прямые ссылки на PKG. Кнопка скачивания появится только у записей с URL пакета.</div>
 </main><footer>Tim · PS4 catalog prototype · web version, not a native PS4 PKG</footer>
 <div id="overlay" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="detailTitle"><div class="dialog"><div class="dialog-head"><div><h2 id="detailTitle" style="margin:0 0 6px"></h2><span id="detailCategory" class="muted"></span></div><button id="close" class="secondary">Закрыть ✕</button></div><p id="detailNotes" class="muted"></p><div id="detailGrid" class="detail-grid"></div><div id="detailAction"></div></div></div>
 <script>
 (function(){
 'use strict';
 const fallback={
- sources:[
-  {id:'psprices-free',name:'PSPrices — бесплатные игры PS4',url:'https://psprices.com/region-ru/collection/free?platform=PS4'},
-  {id:'store-category',name:'PlayStation Store — каталог',url:'https://store.playstation.com/ru-ru/category/30749d2c-738f-4c36-9d6b-7ed517cca9ee/'},
-  {id:'rocket-league',name:'Rocket League — PlayStation Store',url:'https://store.playstation.com/ru-ru/search/rocket%20league'},
-  {id:'brawlhalla',name:'Brawlhalla — PlayStation Store',url:'https://store.playstation.com/ru-ru/search/brawlhalla'}],
- games:[
-  {id:'rocket-league',title:'Rocket League',category:'Free-to-play',sourceId:'rocket-league',region:'—',version:'—',size:null,downloadUrl:null,notes:'Официальная страница поиска. Прямой PKG URL не подтверждён.',coverClass:'rocket',coverEmoji:'🏎️',coverImage:'https://cdn.cloudflare.steamstatic.com/steam/apps/252950/header.jpg'},
-  {id:'brawlhalla',title:'Brawlhalla',category:'Free-to-play',sourceId:'brawlhalla',region:'—',version:'—',size:null,downloadUrl:null,notes:'Официальная страница поиска. Прямой PKG URL не подтверждён.',coverClass:'brawlhalla',coverEmoji:'⚔️',coverImage:'https://cdn.cloudflare.steamstatic.com/steam/apps/291550/header.jpg'}
- ]};
+ sources:[],
+ games:[]
+}
 let data=structuredClone(fallback);
 const $=id=>document.getElementById(id);
 const esc=v=>String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -51,13 +45,13 @@ function render(){
  $('count').textContent='Игры · '+list.length;
  $('games').innerHTML=list.length?list.map(g=>{
  const source=data.sources.find(s=>s.id===g.sourceId);
- const link=g.downloadUrl?'<a href="'+esc(g.downloadUrl)+'" target="_blank" rel="noopener noreferrer">Открыть пакет ↗</a>':source?'<a href="'+esc(source.url)+'" target="_blank" rel="noopener noreferrer">Источник ↗</a>':'';
+ const link=g.downloadUrl?'<a href="'+esc(g.downloadUrl)+'" download>Скачать PKG ↓</a>':source?'<a href="'+esc(source.url)+'" target="_blank" rel="noopener noreferrer">Каталог ↗</a>':'';
  const img=g.coverImage?'<img src="'+esc(g.coverImage)+'" alt="Обложка '+esc(g.title)+'" loading="lazy" referrerpolicy="no-referrer" onerror="this.remove();this.nextElementSibling.style.display=\'none\'"><span class="shade"></span>':'';
  const meta=[g.titleId?'ID '+g.titleId:'',g.region&&g.region!=='—'?'Регион '+g.region:'',g.size?formatSize(g.size):''].filter(Boolean).map(x=>'<span class="pill">'+esc(x)+'</span>').join('');
  return '<article class="card"><div class="cover '+esc(g.coverClass||'')+'">'+img+'<span class="cover-label">PS4 · CATALOG</span><span class="emoji">'+esc(g.coverEmoji||'🎮')+'</span></div><div class="body"><span class="tag">'+esc(g.category||'Games')+'</span><div class="title">'+esc(g.title)+'</div><div class="desc">'+esc(g.notes||'Сведения доступны в подробностях.')+'</div><div class="meta">'+meta+'</div><div class="actions">'+link+'<button class="secondary" data-details="'+esc(g.id)+'" type="button">Подробнее</button></div></div></article>';
- }).join(''):'<div class="empty">Ничего не найдено. Измени запрос или категорию.</div>';
+ }).join(''):'<div class="empty">Каталог пока пуст. Подключи URL совместимого JSON-каталога PKG выше.</div>';
 }
-function showDetails(id){const g=data.games.find(x=>String(x.id)===String(id));if(!g)return;$('detailTitle').textContent=g.title||'Без названия';$('detailCategory').textContent=g.category||'Games';$('detailNotes').textContent=g.notes||'Описание отсутствует.';const rows=[['Title ID',g.titleId||g.title_id],['Версия',g.version],['Размер',formatSize(g.size)],['Регион',g.region],['Дата релиза',g.release],['Минимальная прошивка',g.min_fw]];$('detailGrid').innerHTML=rows.map(([k,v])=>'<div><small>'+esc(k)+'</small>'+esc(v||'—')+'</div>').join('');$('detailAction').innerHTML=g.downloadUrl?'<a href="'+esc(g.downloadUrl)+'" target="_blank" rel="noopener noreferrer" class="source">Открыть ссылку пакета ↗</a>':'<p class="muted">Прямая ссылка на пакет не указана.</p>';$('overlay').classList.remove('hidden')}
+function showDetails(id){const g=data.games.find(x=>String(x.id)===String(id));if(!g)return;$('detailTitle').textContent=g.title||'Без названия';$('detailCategory').textContent=g.category||'Games';$('detailNotes').textContent=g.notes||'Описание отсутствует.';const rows=[['Title ID',g.titleId||g.title_id],['Версия',g.version],['Размер',formatSize(g.size)],['Регион',g.region],['Дата релиза',g.release],['Минимальная прошивка',g.min_fw]];$('detailGrid').innerHTML=rows.map(([k,v])=>'<div><small>'+esc(k)+'</small>'+esc(v||'—')+'</div>').join('');$('detailAction').innerHTML=g.downloadUrl?'<a href="'+esc(g.downloadUrl)+'" target="_blank" rel="noopener noreferrer" class="source">Скачать PKG ↓</a>':'<p class="muted">Прямая ссылка на PKG отсутствует в этой записи.</p>';$('overlay').classList.remove('hidden')}
 async function loadLocal(){try{if(!navigator.onLine)throw Error('offline');const r=await fetch('./catalog.json?ts='+Date.now(),{cache:'no-store'});if(!r.ok)throw Error('HTTP '+r.status);const d=normalize(await r.json());data=d;renderSources();render();status('ok','Онлайн-каталог обновлён · '+data.games.length+' записей')}catch(e){renderSources();render();status('bad','Показан сохранённый каталог · онлайн-обновление недоступно')}}
 $('refresh').addEventListener('click',loadLocal);
 $('search').addEventListener('input',render);$('category').addEventListener('change',render);$('sort').addEventListener('change',render);
