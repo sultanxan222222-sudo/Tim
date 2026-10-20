@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Generate a simple 512x512 RGB PNG icon without third-party packages."""
+import os
 import struct
 import sys
 import zlib
 
 OUT = sys.argv[1] if len(sys.argv) > 1 else "sce_sys/icon0.png"
+os.makedirs(os.path.dirname(OUT) or ".", exist_ok=True)
 W = H = 512
 rows = []
 for y in range(H):
