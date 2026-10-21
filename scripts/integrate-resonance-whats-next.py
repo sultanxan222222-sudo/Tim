@@ -102,8 +102,8 @@ def main() -> None:
 	float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
 	vec3 avg = (n + s + e + west) * 0.25;
 	vec3 sharpened = base + (base - avg) * (0.12 * edgeGate);
-	vec3 lo = min(min(n, s), min(e, west));
-	vec3 hi = max(max(n, s), max(e, west));
+	vec3 lo = min(base, min(min(n, s), min(e, west)));
+	vec3 hi = max(base, max(max(n, s), max(e, west)));
 	color = vec4(clamp(sharpened, lo, hi), 1.0);
 }'''
     replace_once(frame_gen_cpp, old_fragment, new_fragment)
