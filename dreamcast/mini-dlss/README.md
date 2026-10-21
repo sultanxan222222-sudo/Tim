@@ -19,6 +19,22 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
+A convenience runner is also available from the repository root:
+
+```sh
+sh scripts/test-whats-next.sh
+```
+
+For host-side memory/undefined-behavior checks with GCC or Clang:
+
+```sh
+cmake -S dreamcast/mini-dlss -B build/whats-next-sanitize -DWHATS_NEXT_ENABLE_SANITIZERS=ON -DCMAKE_BUILD_TYPE=Debug
+cmake --build build/whats-next-sanitize --parallel
+ctest --test-dir build/whats-next-sanitize --output-on-failure
+```
+
+The sanitizer option is for desktop-host validation only; it is not a PS4 build configuration.
+
 ## Motion estimator contract
 
 `estimate_block_motion(previous, current, config)` returns a coarse grid of displacement vectors. A vector marked invalid must not be used to synthesize an in-between frame; the caller should fall back to the real frame or a conservative blend. Flat blocks and blocks with a poor match are invalid. The current implementation is a CPU reference intended to validate behavior and serve as a baseline for a future GPU implementation.
