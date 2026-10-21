@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(whats_next_history src/history_gate.cpp src/motion_estimator.cpp src/frame_generation_policy.cpp src/frame_generation_controller.cpp src/frame_generation_bridge.cpp)
+add_library(whats_next_history src/history_gate.cpp src/motion_estimator.cpp src/frame_generation_policy.cpp src/frame_generation_controller.cpp src/frame_generation_bridge.cpp src/resonance_frame_adapter.cpp)
 target_include_directories(whats_next_history PUBLIC include)
 
 option(WHATS_NEXT_ENABLE_WARNINGS "Enable strict compiler warnings for the host reference core" ON)
