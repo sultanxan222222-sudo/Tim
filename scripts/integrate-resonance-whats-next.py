@@ -183,6 +183,146 @@ def main() -> None:
         '\tbool fgRealPending = false;\n\twhats_next::FrameGenerationBridge whatsNextBridge;\n'
         '\tu64 fgResourceGeneration = 1;\n\tu64 fgGameSession = 1;\n\tbool fgWasGuiOpen = false;\n'
     )
+
+    # Build a separate shader variant for ordinary frames. The default quad shader is
+    # left unchanged for the UI, while the generator's fragment shader remains in place
+    # for intermediate frames. Both use the same conservative neighbourhood clamp.
+    replace_once(shaders_cpp, quad_fragment_original, quad_fragment_enhanced)
+    replace_once(
+        shaders_cpp,
+        'vk::UniqueShaderModule ShaderManager::compileQuadFragmentShader(bool ignoreTexAlpha)\n',
+        'vk::UniqueShaderModule ShaderManager::compileQuadFragmentShader(bool ignoreTexAlpha, bool miniDlss)\n'
+    )
+    replace_once(
+        shaders_cpp,
+        '.addConstant("IGNORE_TEX_ALPHA", (int)ignoreTexAlpha)\n\t\t\t.addSource(QuadFragmentShaderSource);',
+        '.addConstant("IGNORE_TEX_ALPHA", (int)ignoreTexAlpha)\n'
+        '\t\t\t.addConstant("MINI_DLSS", (int)miniDlss)\n'
+        '\t\t\t.addSource(QuadFragmentShaderSource);'
+    )
+    replace_once(
+        shaders_h,
+        'vk::ShaderModule GetQuadFragmentShader(bool ignoreTexAlpha)\n\t{',
+        'vk::ShaderModule GetQuadFragmentShader(bool ignoreTexAlpha, bool miniDlss = false)\n\t{\n'
+        '\t\tif (miniDlss)\n\t\t{\n'
+        '\t\t\tauto& shader = quadMiniDlssFragmentShader[ignoreTexAlpha ? 1 : 0];\n'
+        '\t\t\tif (!shader)\n'
+        '\t\t\t\tshader = compileQuadFragmentShader(ignoreTexAlpha, true);\n'
+        '\t\t\treturn *shader;\n'
+        '\t\t}'
+    )
+    replace_once(
+        shaders_h,
+        '\t\tquadNoAlphaFragmentShader.reset();\n',
+        '\t\tquadNoAlphaFragmentShader.reset();\n'
+        '\t\tquadMiniDlssFragmentShader[0].reset();\n'
+        '\t\tquadMiniDlssFragmentShader[1].reset();\n'
+    )
+    replace_once(
+        shaders_h,
+        '\tvk::UniqueShaderModule compileQuadFragmentShader(bool ignoreTexAlpha);\n',
+        '\tvk::UniqueShaderModule compileQuadFragmentShader(bool ignoreTexAlpha, bool miniDlss = false);\n'
+    )
+    replace_once(
+        shaders_h,
+        '\tvk::UniqueShaderModule quadNoAlphaFragmentShader;\n',
+        '\tvk::UniqueShaderModule quadNoAlphaFragmentShader;\n'
+        '\tvk::UniqueShaderModule quadMiniDlssFragmentShader[2];\n'
+    )
+    replace_once(
+        quad_h,
+        '\tQuadPipeline(bool ignoreTexAlpha, bool rotate = false)\n'
+        '\t\t: rotate(rotate), ignoreTexAlpha(ignoreTexAlpha) {}',
+        '\tQuadPipeline(bool ignoreTexAlpha, bool rotate = false, bool miniDlss = false)\n'
+        '\t\t: rotate(rotate), ignoreTexAlpha(ignoreTexAlpha), miniDlss(miniDlss) {}'
+    )
+    replace_once(quad_h, '\tbool ignoreTexAlpha;\n', '\tbool ignoreTexAlpha;\n\tbool miniDlss;\n')
+    replace_once(
+        quad_cpp,
+        'shaderManager->GetQuadFragmentShader(ignoreTexAlpha), "main")',
+        'shaderManager->GetQuadFragmentShader(ignoreTexAlpha, miniDlss), "main")'
+    )
+
+    # Source-frame renderers use dedicated pipelines only on PS4. FrameGenerator::Draw
+    # has its own pipeline, and its shader already includes the same spatial finish.
+    replace_once(
+        context_cpp,
+        'quadRotateDrawer = std::make_unique<QuadDrawer>();\n',
+        'quadRotateDrawer = std::make_unique<QuadDrawer>();\n#ifdef __ORBIS__\n'
+        '\t    quadMiniDlssPipeline = std::make_unique<QuadPipeline>(true, false, true);\n'
+        '\t    quadRotateMiniDlssPipeline = std::make_unique<QuadPipeline>(true, true, true);\n'
+        '\t    quadMiniDlssDrawer = std::make_unique<QuadDrawer>();\n'
+        '\t    quadRotateMiniDlssDrawer = std::make_unique<QuadDrawer>();\n'
+        '#endif\n'
+    )
+    replace_once(
+        context_cpp,
+        'quadRotateDrawer->Init(quadRotatePipeline.get());\n',
+        'quadRotateDrawer->Init(quadRotatePipeline.get());\n#ifdef __ORBIS__\n'
+        '\t    quadMiniDlssPipeline->Init(shaderManager.get(), *renderPass, 0);\n'
+        '\t    quadRotateMiniDlssPipeline->Init(shaderManager.get(), *renderPass, 0);\n'
+        '\t    quadMiniDlssDrawer->Init(quadMiniDlssPipeline.get());\n'
+        '\t    quadRotateMiniDlssDrawer->Init(quadRotateMiniDlssPipeline.get());\n'
+        '#endif\n'
+    )
+    replace_once(
+        context_cpp,
+        '\tif (config::Rotate90)\n\t\tquadRotatePipeline->BindPipeline(commandBuffer);\n\telse\n\t\tquadPipeline->BindPipeline(commandBuffer);\n',
+        '#ifdef __ORBIS__\n'
+        '\tconst bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode\n'
+        '\t\t\t&& !gui_is_open() && !(fgDraw && frameGen != nullptr);\n'
+        '\tif (miniDlssActive && config::Rotate90)\n'
+        '\t\tquadRotateMiniDlssPipeline->BindPipeline(commandBuffer);\n'
+        '\telse if (miniDlssActive)\n'
+        '\t\tquadMiniDlssPipeline->BindPipeline(commandBuffer);\n'
+        '\telse\n'
+        '#endif\n'
+        '\tif (config::Rotate90)\n\t\tquadRotatePipeline->BindPipeline(commandBuffer);\n'
+        '\telse\n\t\tquadPipeline->BindPipeline(commandBuffer);\n'
+    )
+    replace_once(
+        context_cpp,
+        '\tif (fgDraw && frameGen != nullptr)\n\t\tframeGen->Draw(commandBuffer, *renderPass);\n'
+        '\telse if (config::Rotate90)\n\t\tquadRotateDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '\telse\n\t\tquadDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n',
+        '\tif (fgDraw && frameGen != nullptr)\n\t\tframeGen->Draw(commandBuffer, *renderPass);\n'
+        '#ifdef __ORBIS__\n'
+        '\telse if (miniDlssActive && config::Rotate90)\n'
+        '\t\tquadRotateMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '\telse if (miniDlssActive)\n'
+        '\t\tquadMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '#endif\n'
+        '\telse if (config::Rotate90)\n'
+        '\t\tquadRotateDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '\telse\n'
+        '\t\tquadDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+    )
+    replace_once(
+        context_cpp,
+        '\tquadDrawer.reset();\n',
+        '#ifdef __ORBIS__\n'
+        '\tquadMiniDlssDrawer.reset();\n\tquadRotateMiniDlssDrawer.reset();\n'
+        '\tquadMiniDlssPipeline.reset();\n\tquadRotateMiniDlssPipeline.reset();\n'
+        '#endif\n'
+        '\tquadDrawer.reset();\n'
+    )
+    replace_once(
+        context_h,
+        '\tstd::unique_ptr<QuadPipeline> quadRotatePipeline;\n',
+        '\tstd::unique_ptr<QuadPipeline> quadRotatePipeline;\n#ifdef __ORBIS__\n'
+        '\tstd::unique_ptr<QuadPipeline> quadMiniDlssPipeline;\n'
+        '\tstd::unique_ptr<QuadPipeline> quadRotateMiniDlssPipeline;\n'
+        '#endif\n'
+    )
+    replace_once(
+        context_h,
+        '\tstd::unique_ptr<QuadDrawer> quadRotateDrawer;\n',
+        '\tstd::unique_ptr<QuadDrawer> quadRotateDrawer;\n#ifdef __ORBIS__\n'
+        '\tstd::unique_ptr<QuadDrawer> quadMiniDlssDrawer;\n'
+        '\tstd::unique_ptr<QuadDrawer> quadRotateMiniDlssDrawer;\n'
+        '#endif\n'
+    )
+
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
     integrated_cmake = cmake.read_text(encoding="utf-8")
     if "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include" not in integrated_cmake or (chr(92) + "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include") in integrated_cmake:
@@ -200,6 +340,10 @@ def main() -> None:
         raise SystemExit("Renderer integration incomplete; missing hooks: " + ", ".join(missing_hooks))
     if "Mini-DLSS spatial finishing pass" not in frame_gen_cpp.read_text(encoding="utf-8"):
         raise SystemExit("Mini-DLSS spatial finishing pass was not installed.")
+    if "quadMiniDlssDrawer->Draw" not in integrated_context:
+        raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
+    if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
+        raise SystemExit("Mini-DLSS quad shader variant was not installed.")
 
     print(f"WHAT'S NEXT lifecycle bridge integrated into {root}")
 
