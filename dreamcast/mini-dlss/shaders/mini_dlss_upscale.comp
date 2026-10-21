@@ -1,0 +1,59 @@
+#version 450
+
+// Mini-DLSS spatial reconstruction prototype.
+// This performs edge-aware spatial upscaling and conservative sharpening.
+// It is NOT neural reconstruction and does not use temporal history, motion vectors, or depth.
+// The adapter must bind a LINEAR-filtered source sampler and a destination storage image.
+layout(set = 0, binding = 0) uniform sampler2D source_image;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D destination_image;
+
+layout(push_constant) uniform MiniDlssParams {
+    ivec2 source_extent;
+    ivec2 destination_extent;
+    float sharpness;
+    float edge_threshold;
+} params;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+float luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(p, params.destination_extent))) {
+        return;
+    }
+
+    vec2 dst_size = vec2(max(params.destination_extent, ivec2(1)));
+    vec2 src_size = vec2(max(params.source_extent, ivec2(1)));
+    vec2 uv = (vec2(p) + vec2(0.5)) / dst_size;
+    vec2 texel = 1.0 / src_size;
+
+    // Linear filtering reconstructs between source texels when destination is larger.
+    vec4 center = texture(source_image, uv);
+    vec3 north = texture(source_image, uv + vec2(0.0, -texel.y)).rgb;
+    vec3 south = texture(source_image, uv + vec2(0.0,  texel.y)).rgb;
+    vec3 west  = texture(source_image, uv + vec2(-texel.x, 0.0)).rgb;
+    vec3 east  = texture(source_image, uv + vec2( texel.x, 0.0)).rgb;
+
+    float edge = max(
+        max(abs(luminance(center.rgb) - luminance(north)),
+            abs(luminance(center.rgb) - luminance(south))),
+        max(abs(luminance(center.rgb) - luminance(west)),
+            abs(luminance(center.rgb) - luminance(east)))
+    );
+
+    float threshold = max(params.edge_threshold, 0.0001);
+    float edge_gate = smoothstep(threshold, threshold * 3.0, edge);
+    vec3 local_average = (north + south + west + east) * 0.25;
+    float amount = clamp(params.sharpness, 0.0, 0.30) * (1.0 - edge_gate);
+    vec3 reconstructed = center.rgb + (center.rgb - local_average) * amount;
+
+    // Avoid ringing outside the local source neighbourhood's colour range.
+    vec3 local_min = min(center.rgb, min(min(north, south), min(west, east)));
+    vec3 local_max = max(center.rgb, max(max(north, south), max(west, east)));
+    reconstructed = clamp(reconstructed, local_min, local_max);
+    imageStore(destination_image, p, vec4(clamp(reconstructed, 0.0, 1.0), center.a));
+}
