@@ -18,6 +18,18 @@ int main() {
     bridge.commit_real_frame();
     assert(bridge.current_frame_id() == 2);
 
+    // If the renderer begins a replacement before committing the previous
+    // source frame, temporal history must be discarded and the replacement
+    // must not inherit the old frame's generation decision.
+    decision = bridge.begin_real_frame(
+        true, 640, 480, PixelFormat::RGBA8, 1, 1, {2});
+    assert(decision == FrameGenerationDecision::GenerateIntermediate);
+    decision = bridge.begin_real_frame(
+        true, 640, 480, PixelFormat::RGBA8, 1, 1, {2});
+    assert(decision == FrameGenerationDecision::PresentRealFirstFrame);
+    bridge.commit_real_frame();
+    assert(bridge.current_frame_id() == 3);
+
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 1, 1, {2});
     assert(decision == FrameGenerationDecision::GenerateIntermediate);
