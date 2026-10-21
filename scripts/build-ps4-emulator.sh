@@ -26,7 +26,7 @@ done
 [[ -f "$RESONANCE_DIR/patches/BASE.txt" ]] || fail "Resonance patches/BASE.txt is missing."
 
 # Check every required upstream build script before touching the build tree.
-for script in clone-flycast.sh seed-build-tree.sh build-netfs.sh rebuild-flycast.sh package-resonance.sh; do
+for script in seed-build-tree.sh build-netfs.sh rebuild-flycast.sh package-resonance.sh; do
     [[ -f "$RESONANCE_DIR/scripts/$script" ]] || fail "Required Resonance build script is missing: scripts/$script"
 done
 [[ -f "$ROOT/scripts/apply-resonance-whats-next.sh" ]] || fail "WHAT'S NEXT overlay script is missing."
@@ -39,15 +39,36 @@ export RESONANCE_VERSION="$VERSION"
 step "1/7 — Host contract tests"
 bash "$ROOT/scripts/test-whats-next.sh" 2>&1 | tee "$LOG_DIR/whats-next-host-tests.log"
 
-step "2/7 — Prepare Flycast source"
-bash "$RESONANCE_DIR/scripts/clone-flycast.sh" 2>&1 | tee "$LOG_DIR/clone-flycast.log"
-[[ -d "$FLYCAST_SRC/.git" ]] || fail "clone-flycast.sh did not produce $FLYCAST_SRC."
+step "2/7 — Prepare pinned Flycast and network dependency sources"
+# Upstream clone-flycast.sh contains a machine-specific /mnt/e symlink. Clone here
+# instead, so this driver respects RESONANCE_DIR and never rewrites that path.
+if [[ ! -d "$HOME/resonance" && ! -e "$HOME/resonance" ]]; then
+    ln -s "$RESONANCE_DIR" "$HOME/resonance"
+fi
+if [[ -L "$HOME/resonance" && "$(readlink -f "$HOME/resonance")" != "$(readlink -f "$RESONANCE_DIR")" ]]; then
+    fail "$HOME/resonance points to a different checkout. Set up the expected symlink manually; this script will not replace it."
+fi
+if [[ ! -d "$FLYCAST_SRC/.git" ]]; then
+    [[ ! -e "$FLYCAST_SRC" ]] || fail "$FLYCAST_SRC exists but is not a Git checkout; move it aside before cloning."
+    git clone --recursive https://github.com/flyinghead/flycast.git "$FLYCAST_SRC" 2>&1 | tee "$LOG_DIR/clone-flycast.log"
+fi
 
 BASE="$(awk '$1 == "base:" {print $2; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
 [[ -n "$BASE" ]] || fail "Could not read the pinned Flycast revision from patches/BASE.txt."
 git -C "$FLYCAST_SRC" fetch --quiet origin "$BASE"
 git -C "$FLYCAST_SRC" checkout --detach "$BASE"
 git -C "$FLYCAST_SRC" submodule update --init --recursive
+for dep in libnfs libsmb2; do
+    url="$(awk -v name="$dep" '$1 == name \\( $0 ~ name \\) {print $3; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
+    sha="$(awk -v name="$dep" '$1 == name {print $2; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
+    [[ -n "$url" && -n "$sha" ]] || fail "Could not read pinned $dep source from patches/BASE.txt."
+    if [[ ! -d "$PS4_BUILD_ROOT/src/$dep/.git" ]]; then
+        [[ ! -e "$PS4_BUILD_ROOT/src/$dep" ]] || fail "$PS4_BUILD_ROOT/src/$dep exists but is not a Git checkout."
+        git clone "$url" "$PS4_BUILD_ROOT/src/$dep"
+    fi
+    git -C "$PS4_BUILD_ROOT/src/$dep" fetch --quiet origin "$sha"
+    git -C "$PS4_BUILD_ROOT/src/$dep" checkout --detach "$sha"
+done
 
 step "3/7 — Apply Resonance PS4 patch and WHAT'S NEXT overlay"
 PATCH="$RESONANCE_DIR/patches/flycast-ps4.patch"
