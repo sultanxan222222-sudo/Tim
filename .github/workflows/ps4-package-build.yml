@@ -26,7 +26,7 @@ jobs:
     timeout-minutes: 360
     env:
       OPENORBIS: /opt/pacbrew/ps4/openorbis
-      DOLPHIN_PS4_SOURCE: ${{ runner.temp }}/DolphinPS4
+      DOLPHIN_PS4_SOURCE: /home/runner/work/_temp/DolphinPS4
       CRM: /home/runner/dolphinps4-build
       RESONANCE_DIR: /home/runner/resonance
       PS4_BUILD_ROOT: /home/runner/resonance-build
