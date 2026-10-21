@@ -1,6 +1,8 @@
 #include "whats_next/frame_generation_policy.hpp"
 
 #include <cassert>
+#include <cstdint>
+#include <limits>
 
 using namespace whats_next;
 
@@ -20,6 +22,19 @@ int main() {
            FrameGenerationDecision::PresentRealHistoryRejected);
     assert(policy.decide(true, frame, HistoryDecision::RejectResourceChanged, {2}) ==
            FrameGenerationDecision::PresentRealHistoryRejected);
+    assert(policy.decide(true, frame, HistoryDecision::Accept,
+                         {std::numeric_limits<std::uint32_t>::max()}) ==
+           FrameGenerationDecision::PresentRealCadenceMismatch);
+    assert(policy.decide(true, frame, HistoryDecision::RejectSessionChanged, {2}) ==
+           FrameGenerationDecision::PresentRealHistoryRejected);
+    assert(policy.decide(true, frame, HistoryDecision::RejectInvalidCurrent, {2}) ==
+           FrameGenerationDecision::PresentRealHistoryRejected);
+
+    auto zero_frame_id = frame;
+    zero_frame_id.frame_id = 0;
+    assert(policy.decide(true, zero_frame_id, HistoryDecision::Accept, {2}) ==
+           FrameGenerationDecision::PresentRealHistoryRejected);
+
     assert(policy.decide(true, frame, HistoryDecision::Accept, {2}) ==
            FrameGenerationDecision::GenerateIntermediate);
 
