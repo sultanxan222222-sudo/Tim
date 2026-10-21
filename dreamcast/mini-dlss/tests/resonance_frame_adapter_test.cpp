@@ -33,7 +33,7 @@ int main() {
     // One refresh interval is not the intended 30-to-60 cadence.
     decision = adapter.begin_source_frame(
         true, 1280, 720, PixelFormat::RGBA8, 2, 7, 1);
-    assert(decision == FrameGenerationDecision::PresentRealHistoryRejected);
+    assert(decision == FrameGenerationDecision::PresentRealCadenceMismatch);
     adapter.commit_source_frame();
 
     adapter.reset();
