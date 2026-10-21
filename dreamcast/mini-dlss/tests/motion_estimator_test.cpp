@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cstdint>
+#include <limits>
 #include <vector>
 
 using namespace whats_next;
@@ -83,5 +84,22 @@ int main() {
     auto invalid_config = estimate_block_motion(
         {previous.data(), w, h, w}, {current.data(), w, h, w}, cfg);
     assert(!invalid_config.valid);
+
+    // NaN and infinity are not meaningful thresholds; reject them explicitly.
+    cfg.sample_step = 1;
+    cfg.max_mean_absolute_error = std::numeric_limits<float>::quiet_NaN();
+    auto nan_threshold = estimate_block_motion(
+        {previous.data(), w, h, w}, {current.data(), w, h, w}, cfg);
+    assert(!nan_threshold.valid);
+    cfg.max_mean_absolute_error = 18.0f;
+    cfg.minimum_texture_variance = std::numeric_limits<float>::infinity();
+    auto infinite_variance = estimate_block_motion(
+        {previous.data(), w, h, w}, {current.data(), w, h, w}, cfg);
+    assert(!infinite_variance.valid);
+
+    // A null image pointer is invalid even when dimensions look plausible.
+    auto null_input = estimate_block_motion(
+        {nullptr, w, h, w}, {current.data(), w, h, w}, cfg);
+    assert(!null_input.valid);
     return 0;
 }
