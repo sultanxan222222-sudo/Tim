@@ -49,5 +49,39 @@ int main() {
     auto bad_stride = estimate_block_motion({previous.data(), w, h, w - 1},
                                              {current.data(), w, h, w}, cfg);
     assert(!bad_stride.valid);
+    // Padded row stride must be respected; padding bytes are intentionally noisy.
+    constexpr std::size_t padded_stride = w + 7;
+    std::vector<std::uint8_t> padded_prev(padded_stride * h, 0xEE);
+    std::vector<std::uint8_t> padded_curr(padded_stride * h, 0xDD);
+    for (std::uint32_t y = 0; y < h; ++y) {
+        for (std::uint32_t x = 0; x < w; ++x) {
+            padded_prev[y * padded_stride + x] = previous[y * w + x];
+            padded_curr[y * padded_stride + x] = current[y * w + x];
+        }
+    }
+    auto padded_field = estimate_block_motion(
+        {padded_prev.data(), w, h, padded_stride},
+        {padded_curr.data(), w, h, padded_stride}, cfg);
+    assert(padded_field.valid);
+    assert(padded_field.vectors[0].valid);
+    assert(padded_field.vectors[0].dx == 2);
+    assert(padded_field.vectors[0].dy == 0);
+
+    // A scene-wide unrelated image should not be mistaken for a good match.
+    std::vector<std::uint8_t> unrelated(w * h);
+    for (std::uint32_t y = 0; y < h; ++y)
+        for (std::uint32_t x = 0; x < w; ++x)
+            unrelated[y * w + x] = static_cast<std::uint8_t>((x * 13 + y * 29 + 71) & 255);
+    cfg.max_mean_absolute_error = 0.0f;
+    auto cut_field = estimate_block_motion(
+        {previous.data(), w, h, w}, {unrelated.data(), w, h, w}, cfg);
+    assert(cut_field.valid);
+    assert(!cut_field.vectors[0].valid);
+
+    // Invalid configuration must fail closed rather than allocate/scan.
+    cfg.sample_step = 0;
+    auto invalid_config = estimate_block_motion(
+        {previous.data(), w, h, w}, {current.data(), w, h, w}, cfg);
+    assert(!invalid_config.valid);
     return 0;
 }
