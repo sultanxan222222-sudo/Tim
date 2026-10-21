@@ -48,5 +48,9 @@ int main() {
         false, 1280, 720, PixelFormat::RGBA8, 2, 8, 2);
     assert(decision == FrameGenerationDecision::BypassDisabled);
     adapter.commit_source_frame();
+    decision = adapter.begin_source_frame(
+        true, 1280, 720, PixelFormat::RGBA8, 2, 8, 2);
+    assert(decision == FrameGenerationDecision::GenerateIntermediate);
+    adapter.commit_source_frame();
     return 0;
 }
