@@ -90,6 +90,7 @@ def main() -> None:
         (cmake, 'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'),
         (cmake, '            frame_gen.cpp\n'),
         (context_cpp, '#include "frame_gen.h"\n'),
+        (context_cpp, 'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{'),
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
         (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
@@ -164,6 +165,17 @@ def main() -> None:
         context_cpp,
         '#include "frame_gen.h"\n',
         '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n'
+    )
+    replace_once(
+        context_cpp,
+        'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{',
+        'void VulkanContext::CreateSwapChain()\n{\n#ifdef __ORBIS__\n'
+        '\t++fgResourceGeneration;\n'
+        '\twhatsNextBridge.reset();\n'
+        '\tfgPrevView = vk::ImageView();\n'
+        '\tfgPrevExtent = vk::Extent2D();\n'
+        '\tfgStreak = 0;\n'
+        '#endif\n\ttry\n\t{'
     )
 
     # The existing frame-generation fragment shader is the only safe insertion point
