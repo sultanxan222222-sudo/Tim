@@ -1,0 +1,24 @@
+name: Mini-DLSS host tests
+
+on:
+  push:
+    paths:
+      - "dreamcast/mini-dlss/**"
+      - ".github/workflows/mini-dlss-tests.yml"
+  pull_request:
+    paths:
+      - "dreamcast/mini-dlss/**"
+      - ".github/workflows/mini-dlss-tests.yml"
+  workflow_dispatch:
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S dreamcast/mini-dlss -B build/mini-dlss -DCMAKE_BUILD_TYPE=Release
+      - name: Build
+        run: cmake --build build/mini-dlss --parallel 2
+      - name: Run tests
+        run: ctest --test-dir build/mini-dlss --output-on-failure
