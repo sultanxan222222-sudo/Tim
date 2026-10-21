@@ -1,13 +1,14 @@
 # WHAT'S NEXT + Mini-DLSS: integration core
 
-This directory contains the first small C++ component intended to become part of the coordinated graphics pipeline.
+This directory contains a backend-neutral C++ core for the coordinated Dreamcast graphics pipeline.
 
 ## Implemented
 
-- A backend-neutral frame contract shared by processing stages.
-- A history compatibility gate that rejects invalid frames, stale/non-consecutive frames, resolution/format/resource changes, and game-session changes.
-- A host-side CMake test target.
-- An unintegrated Vulkan compute shader prototype for conservative spatial sharpening (not FSR/DLSS and not temporal reconstruction).
+- Shared frame contract for completed emulator frames.
+- Conservative history gate: rejects invalid frames, stale/non-consecutive frames, and session/resource/size/format changes.
+- CPU reference block-motion estimator for tightly packed 8-bit luminance frames. It performs bounded sum-of-absolute-differences matching, rejects flat/low-texture blocks, and attaches a confidence score.
+- Host-side CMake tests for history validation and motion estimation.
+- Unintegrated Vulkan compute shader prototype for spatial edge-aware sharpening.
 
 ## Build and test on a desktop host
 
@@ -17,15 +18,22 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
-The test exercises the acceptance path and the invalidation paths. The code has been compiled with GNU C++ 14.2 and the CTest target passed in the development environment.
+## Motion estimator contract
 
-## What is not implemented yet
+`estimate_block_motion(previous, current, config)` returns a coarse grid of displacement vectors. A vector marked invalid must not be used to synthesize an in-between frame; the caller should fall back to the real frame or a conservative blend. Flat blocks and blocks with a poor match are invalid. The current implementation is a CPU reference intended to validate behavior and serve as a baseline for a future GPU implementation.
 
-This is not yet connected to Resonance/Flycast's Vulkan render pass. The sharpening shader source exists, but no Vulkan descriptors, shader compilation, dispatch, motion vectors, depth images, or GPU submissions are connected. The PS4 build toolchain and console runtime are not present in this host test, so this is not a PS4 build and produces no PKG.
+## Not yet implemented / limitations
+
+- No integration into Resonance/Flycast's Vulkan render pass.
+- No GPU dispatch, Vulkan descriptors, motion-vector image, depth image, or presentation scheduling is connected.
+- The motion estimator is not yet optimized for real-time PS4 use; it is a CPU baseline, not an acceptable final full-resolution path.
+- The estimator returns displacement/confidence only; it does not synthesize an intermediate frame.
+- The sharpening shader is not FSR/DLSS or temporal reconstruction.
+- No PS4 build, PKG, or console test has been performed.
 
 ## Integration constraints
 
-- The renderer adapter must increment `resource_generation` whenever the backing render images or format are recreated.
+- The renderer adapter must increment `resource_generation` whenever backing render images or format are recreated.
 - `game_session` must change on game/session restart.
-- History is only eligible for consecutive frames in this initial conservative version.
-- The temporal stage must remain disabled until the renderer adapter proves that its inputs are valid.
+- History is eligible only for consecutive frames in this conservative first version.
+- Temporal interpolation must remain disabled until frame input, motion confidence, and presentation timing are validated on the target renderer.
