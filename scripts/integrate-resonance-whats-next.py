@@ -29,7 +29,11 @@ def main() -> None:
     context_cpp = root / "core/rend/vulkan/vulkan_context.cpp"
     context_h = root / "core/rend/vulkan/vulkan_context.h"
     cmake = root / "core/rend/vulkan/CMakeLists.txt"
-    if not all(p.is_file() for p in (context_cpp, context_h, cmake, root / "core/rend/vulkan/frame_gen.cpp")):
+    shaders_cpp = root / "core/rend/vulkan/shaders.cpp"
+    shaders_h = root / "core/rend/vulkan/shaders.h"
+    quad_cpp = root / "core/rend/vulkan/quad.cpp"
+    quad_h = root / "core/rend/vulkan/quad.h"
+    if not all(p.is_file() for p in (context_cpp, context_h, cmake, shaders_cpp, shaders_h, quad_cpp, quad_h, root / "core/rend/vulkan/frame_gen.cpp")):
         raise SystemExit("Not a Resonance-patched Flycast tree: required Vulkan renderer files are missing.")
 
     module = repo / "dreamcast/mini-dlss"
