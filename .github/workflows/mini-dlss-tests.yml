@@ -22,3 +22,17 @@ jobs:
         run: cmake --build build/mini-dlss --parallel 2
       - name: Run tests
         run: ctest --test-dir build/mini-dlss --output-on-failure
+
+  sanitizer-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure with AddressSanitizer and UndefinedBehaviorSanitizer
+        run: cmake -S dreamcast/mini-dlss -B build/mini-dlss-sanitize -DCMAKE_BUILD_TYPE=Debug -DWHATS_NEXT_ENABLE_SANITIZERS=ON
+      - name: Build
+        run: cmake --build build/mini-dlss-sanitize --parallel 2
+      - name: Run sanitized tests
+        env:
+          ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: ctest --test-dir build/mini-dlss-sanitize --output-on-failure
