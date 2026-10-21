@@ -1,0 +1,4 @@
+# Local CMake builds and test artifacts
+/build/
+/cmake-build-*/
+/dreamcast/mini-dlss/build/
