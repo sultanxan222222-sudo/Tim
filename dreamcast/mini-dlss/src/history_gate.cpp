@@ -20,7 +20,7 @@ HistoryDecision HistoryGate::evaluate(const FrameContract& current) const noexce
 
     // This first version only accepts consecutive frames. If frames were
     // dropped, never blend stale history and introduce a visible ghost.
-    if (current.frame_id != previous_.frame_id + 1)
+    if (previous_.frame_id == UINT64_MAX || current.frame_id != previous_.frame_id + 1)
         return HistoryDecision::RejectDiscontinuity;
 
     return HistoryDecision::Accept;
