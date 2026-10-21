@@ -121,6 +121,28 @@ fi
 grep -q 'whatsNextBridge.commit_real_frame' "$FLYCAST_SRC/core/rend/vulkan/vulkan_context.cpp" || fail "Missing WHAT'S NEXT history commit hook."
 grep -q 'Mini-DLSS spatial finishing pass' "$FLYCAST_SRC/core/rend/vulkan/frame_gen.cpp" || fail "Missing Mini-DLSS renderer finishing pass."
 
+# libcurl is a static archive built with zlib support; CMake cannot infer the
+# archive's private dependencies from an absolute .a path, so link libz explicitly.
+PS4_SHELL_CMAKE="$FLYCAST_SRC/shell/ps4/CMakeLists.txt"
+[[ -f "$PS4_SHELL_CMAKE" ]] || fail "PS4 frontend CMake file is missing: $PS4_SHELL_CMAKE"
+python3 - "$PS4_SHELL_CMAKE" <<'PY'
+from pathlib import Path
+import sys
+
+path = Path(sys.argv[1])
+text = path.read_text(encoding="utf-8")
+needle = "${PS4_SYSROOT}/lib/libcurl.a ${PS4_SYSROOT}/lib/libssl.a ${PS4_SYSROOT}/lib/libcrypto.a)"
+replacement = needle[:-1] + " ${PS4_SYSROOT}/lib/libz.a)"
+if "${PS4_SYSROOT}/lib/libz.a" not in text:
+    if needle not in text:
+        raise SystemExit("Cannot identify the PS4 static curl/OpenSSL link line; refusing to patch an unknown layout.")
+    text = text.replace(needle, replacement, 1)
+    path.write_text(text, encoding="utf-8")
+if "${PS4_SYSROOT}/lib/libz.a" not in text:
+    raise SystemExit("libz.a was not added to the PS4 frontend link dependencies.")
+print("Verified PS4 static link dependencies: libcurl, libssl, libcrypto, libz")
+PY
+
 step "4/7 — Seed PS4 build tree"
 bash "$RESONANCE_DIR/scripts/seed-build-tree.sh" 2>&1 | tee "$LOG_DIR/seed-build-tree.log"
 
