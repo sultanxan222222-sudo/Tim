@@ -32,6 +32,24 @@ target_link_libraries(frame_generation_controller_test PRIVATE whats_next_histor
 add_executable(frame_generation_bridge_test tests/frame_generation_bridge_test.cpp)
 target_link_libraries(frame_generation_bridge_test PRIVATE whats_next_history)
 
+# These tests use assert() as their assertion mechanism. CMake's Release
+# configuration normally defines NDEBUG, which would silently compile every
+# assertion out. Explicitly keep assertions active for all test executables.
+set(WHATS_NEXT_TEST_TARGETS
+    history_gate_test
+    motion_estimator_test
+    frame_generation_policy_test
+    frame_generation_controller_test
+    frame_generation_bridge_test
+)
+foreach(target IN LISTS WHATS_NEXT_TEST_TARGETS)
+    if(MSVC)
+        target_compile_options(${target} PRIVATE /UNDEBUG)
+    else()
+        target_compile_options(${target} PRIVATE -UNDEBUG)
+    endif()
+endforeach()
+
 enable_testing()
 add_test(NAME history_gate_test COMMAND history_gate_test)
 add_test(NAME motion_estimator_test COMMAND motion_estimator_test)
