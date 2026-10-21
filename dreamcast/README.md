@@ -20,14 +20,15 @@ A coordinated enhancement stack for Dreamcast games on a PS4 Pro running Flycast
 
 ## Current status
 
-- [x] Initial architecture and integration constraints documented.
-- [ ] Identify and pin the exact Flycast PS4 source revision and renderer/API.
-- [ ] Build a renderer adapter against that source.
-- [ ] Integrate the existing Mini-DLSS GLSL prototype where supported.
-- [ ] Add automated tests for shared frame contracts and history invalidation.
-- [ ] Measure performance on target hardware.
-- [ ] Design library discovery and save-state integration after confirming the actual PS4 app/runtime constraints.
+- [x] Selected Resonance as the PS4/Flycast base and use the Flycast revision pinned by Resonance in `patches/BASE.txt`.
+- [x] Implemented and host-tested the shared WHAT'S NEXT frame contract, history gate, cadence policy, controller, and renderer bridge.
+- [x] Added an integration script that applies the bridge to Resonance's existing Vulkan frame-generation path and places a conservative spatial sharpening operation in its interpolation fragment shader.
+- [x] GitHub Actions successfully applies the overlay to the pinned Flycast source, compiles the bridge C++ files, compiles the modified fragment shader, and runs normal plus ASan/UBSan host tests.
+- [x] Added `scripts/build-ps4-emulator.sh` to run the host tests, prepare the pinned source/dependencies, apply the integration, build with the local PS4 toolchain, package the app, and verify the expected `.pkg`.
+- [ ] Complete a real PS4-toolchain build and produce an installable PKG.
+- [ ] Install and test on PS4 Pro; measure frame pacing, latency, memory use, and image artifacts.
+- [ ] Wire the standalone compute upscaler into a dedicated GPU render target. It is validated as a shader but is not yet part of the live presentation pipeline.
 
 ## Important limitations
 
-This is not yet a PS4 PKG and is not yet integrated with Flycast. Generic image shaders cannot reliably reconstruct missing geometry or infer every material. Temporal reconstruction requires valid motion/history inputs and can produce artifacts. Game discovery and save-state support depend on the real platform permissions and Flycast build.
+No PS4 PKG has yet been built from this repository's integration, and no on-console validation has been performed. The currently integrated Mini-DLSS stage is a conservative spatial sharpening pass, not NVIDIA DLSS and not neural reconstruction. It cannot invent reliable missing geometry or facial detail. Temporal reconstruction/frame generation can introduce ghosting, edge wobble, or added input latency. Existing Resonance game discovery, VMU, and save-state features should be reused rather than reimplemented.
