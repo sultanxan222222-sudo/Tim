@@ -16,6 +16,6 @@ The overlay patch in `dreamcast/patches/resonance-whats-next.patch` connects the
 
 ## Integration scope and remaining validation
 
-The patch adds the backend-neutral history/cadence sources to the Vulkan target, gates the existing interpolation pass through WHAT'S NEXT, and invalidates history on extent changes and GUI transitions. The current renderer contract maps the Flycast presentation image to RGBA8; confirm that assumption against the actual framebuffer format before relying on the gate for every renderer configuration.
+The patch adds the backend-neutral history/cadence sources to the Vulkan target, gates the existing interpolation pass through WHAT'S NEXT, and invalidates history on extent changes and GUI transitions. The patch currently labels the Flycast presentation image as RGBA8. This is an integration assumption, not a console-verified fact; confirm the actual framebuffer format before relying on the gate for every renderer configuration.
 
 This is an overlay patch committed in Tim; it has not been applied to or committed into the third-party Resonance repository. A successful host CI run for Tim does not prove that the PS4 Vulkan target compiles. Build with Resonance's documented PS4 toolchain and test on console before treating this as a usable PS4 package. Mini-DLSS's spatial shader is not yet wired into this patch.
