@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - "dreamcast/mini-dlss/**"
+      - "scripts/build-ps4-emulator.sh"
       - ".github/workflows/mini-dlss-tests.yml"
   pull_request:
     paths:
@@ -16,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Validate build driver shell syntax
+        run: bash -n scripts/build-ps4-emulator.sh scripts/test-whats-next.sh scripts/apply-resonance-whats-next.sh
       - name: Configure
         run: cmake -S dreamcast/mini-dlss -B build/mini-dlss -DCMAKE_BUILD_TYPE=Release
       - name: Build
