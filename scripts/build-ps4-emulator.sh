@@ -71,14 +71,15 @@ if [[ ! -d "$FLYCAST_SRC/.git" ]]; then
 else
     REMOTE="$(git -C "$FLYCAST_SRC" remote get-url origin 2>/dev/null || true)"
     [[ "$REMOTE" == "https://github.com/flyinghead/flycast.git" || "$REMOTE" == "git@github.com:flyinghead/flycast.git" ]] || fail "Dedicated Flycast build folder has an unexpected origin: $REMOTE"
-    # This folder is reserved for repeatable builds. Reset only this dedicated checkout so
-    # a previous run's patch/overlay cannot break the next run's pinned-base check.
-    git -C "$FLYCAST_SRC" fetch --quiet origin "$BASE"
-    git -C "$FLYCAST_SRC" reset --hard "$BASE"
-    git -C "$FLYCAST_SRC" clean -ffd
+    git -C "$FLYCAST_SRC" fetch --quiet origin
 fi
-git -C "$FLYCAST_SRC" fetch --quiet origin "$BASE"
-git -C "$FLYCAST_SRC" checkout --detach "$BASE"
+# BASE.txt records a short hash. Fetch branch history first, then resolve it locally to
+# a full object ID; git-upload-pack is not required to accept an abbreviated SHA as a want.
+BASE_FULL="$(git -C "$FLYCAST_SRC" rev-parse --verify "\${BASE}^{commit}" 2>/dev/null || true)"
+[[ "$BASE_FULL" =~ ^[0-9a-f]{40}$ ]] || fail "Pinned Flycast revision $BASE is not present in the fetched upstream history."
+git -C "$FLYCAST_SRC" reset --hard "$BASE_FULL"
+git -C "$FLYCAST_SRC" clean -ffd
+git -C "$FLYCAST_SRC" checkout --detach "$BASE_FULL"
 git -C "$FLYCAST_SRC" submodule update --init --recursive
 for dep in libnfs libsmb2; do
     url="$(awk -v name="$dep" '$1 == name ":" {print $3; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
