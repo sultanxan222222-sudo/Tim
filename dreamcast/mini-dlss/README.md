@@ -6,6 +6,7 @@ This directory contains a backend-neutral C++ core for the coordinated Dreamcast
 
 - Shared frame contract for completed emulator frames.
 - Conservative history gate: rejects invalid frames, stale/non-consecutive frames, and session/resource/size/format changes.
+- Integrated frame-generation controller that evaluates history and cadence as one decision, with an explicit rule that generated frames are never committed as real source history.
 - CPU reference block-motion estimator for tightly packed 8-bit luminance frames. It performs bounded sum-of-absolute-differences matching, rejects flat/low-texture blocks, and attaches a confidence score.
 - Host-side CMake tests for history validation and motion estimation.
 - Unintegrated Vulkan compute shader prototype for spatial edge-aware sharpening.
@@ -41,8 +42,7 @@ ctest --test-dir build --output-on-failure
 
 ## M33-inspired frame-generation scheduling
 
-The host-side control layer now includes `whats_next/frame_generation_policy.hpp` and
-`src/frame_generation_policy.cpp`. It does not render pixels or allocate Vulkan resources. It makes
+The host-side control layer includes `whats_next/frame_generation_policy.hpp`, `src/frame_generation_policy.cpp`, and the combined `frame_generation_controller.hpp/.cpp`. It does not render pixels or allocate Vulkan resources. It makes
 the safe scheduling decision around a renderer's existing frame-generation path:
 
 - Disabled feature -> bypass and show the real frame.
@@ -51,6 +51,6 @@ the safe scheduling decision around a renderer's existing frame-generation path:
 - Cadence other than exactly two display refresh intervals -> show the real frame.
 - Only enabled + valid accepted history + a two-refresh interval -> permit an intermediate frame.
 
-The decision is covered by `tests/frame_generation_policy_test.cpp` and added to CMake/CTest.
+The decision is covered by `tests/frame_generation_policy_test.cpp` and `tests/frame_generation_controller_test.cpp`; both are added to CMake/CTest.
 
-Important discovery: Resonance already has its own experimental frame-generation feature and exposes Per Triangle / Per Strip / Per Pixel modes. Before implementing a second interpolation renderer, WHAT'S NEXT should wrap/audit that existing implementation and compare it with M33's GPU block-motion method. This policy is a control layer, not a claim that M33's shader has been integrated.
+Important discovery: the actual Resonance PS4 patch already adds `core/rend/vulkan/frame_gen.cpp/.h` and hooks it into `VulkanContext::PresentFrame()` / `DrawFrame()`. It uses GPU coarse/fine motion search and an intermediate Vulkan draw. WHAT'S NEXT should connect its controller to this existing path instead of creating a second renderer. Per Triangle / Per Strip / Per Pixel are alpha-sorting settings, not frame-generation modes. This controller is a tested control layer, not a claim that it is already wired into Resonance.
