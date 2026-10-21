@@ -42,6 +42,6 @@ struct MotionField {
 MotionField estimate_block_motion(
     GrayImageView previous,
     GrayImageView current,
-    const MotionConfig& config = {}) noexcept;
+    const MotionConfig& config = {});
 
 } // namespace whats_next
