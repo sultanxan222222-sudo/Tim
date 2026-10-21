@@ -42,12 +42,11 @@ Sources: [VCFG README](https://github.com/Melnikoff07/vcfg), [architecture](http
 
 ## Implementation sequence
 
-1. Inspect M33's presentation pass and VCFG's hierarchical optical-flow stages as algorithm references.
-2. Map Flycast's pinned source and Resonance's PS4 patch to the actual frame acquisition/presentation boundary, image formats, and synchronization lifecycle.
-3. Keep WHAT'S NEXT's frame contract and history gate as the shared control layer; route frame validity, scene-cut/resize resets, and confidence/fallback decisions through it.
-4. Implement an independent Vulkan-native GPU prototype, with the original-frame path as fallback. Do not run the CPU reference motion estimator over full-resolution frames in the real-time PS4 path.
-5. Keep spatial upscaling/sharpening as a separate stage, initially using an independently validated shader where the renderer/API supports it.
-6. Validate with host tests, then the PS4 toolchain, then real-console captures and frame-time/input-latency measurements.
+1. Reuse Resonance's existing `FrameGenerator` instead of implementing a second renderer.
+2. Integrate `FrameGenerationController` at `VulkanContext::PresentFrame()`: real frames only, explicit reset on resize/menu/game-session changes, and commit only real source frames to history.
+3. Compare the current coarse/fine block search against M33 and VCFG; improve confidence/disocclusion fallback only when measurements justify the cost.
+4. Keep spatial upscaling/sharpening as a separate stage; do not label a sharpening-only pass as DLSS or temporal upscaling.
+5. Validate with host tests, then the PS4 toolchain, then real-console captures and frame-time/input-latency measurements.
 
 ## Current status
 
