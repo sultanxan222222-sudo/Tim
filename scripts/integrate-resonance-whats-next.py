@@ -71,19 +71,19 @@ def main() -> None:
         '#ifdef __ORBIS__\n\tbool sourceAccepted = false;\n\t// a new frame from the renderer'
     )
 
-    bridge_gate = '''\\t\\t\\t\\t&& fgPrevExtent == extent;
-\\t\\tconst bool eligible = interpolate;
-\\t\\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
-\\t\\t{
-\\t\\t\\t++fgResourceGeneration;
-\\t\\t\\twhatsNextBridge.reset();
-\\t\\t}
-\\t\\tconst auto decision = whatsNextBridge.begin_real_frame(
-\\t\\t\\t\\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
-\\t\\t\\t\\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
-\\t\\t\\t\\t\\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
-\\t\\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;'''
-    replace_once(context_cpp, '\\t\\t\\t\\t&& fgPrevExtent == extent;\\n', bridge_gate + '\\n')
+    bridge_gate = '''\t\t\t\t&& fgPrevExtent == extent;
+\t\tconst bool eligible = interpolate;
+\t\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
+\t\t{
+\t\t\t++fgResourceGeneration;
+\t\t\twhatsNextBridge.reset();
+\t\t}
+\t\tconst auto decision = whatsNextBridge.begin_real_frame(
+\t\t\t\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
+\t\t\t\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
+\t\t\t\t\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
+\t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;'''
+    replace_once(context_cpp, '\t\t\t\t&& fgPrevExtent == extent;\\n', bridge_gate + '\\n')
 
     replace_once(
         context_cpp,
