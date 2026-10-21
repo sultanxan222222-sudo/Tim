@@ -101,5 +101,23 @@ int main() {
     auto null_input = estimate_block_motion(
         {nullptr, w, h, w}, {current.data(), w, h, w}, cfg);
     assert(!null_input.valid);
+
+    // Guardrails for pathological search settings and unsupported block sizes.
+    cfg.minimum_texture_variance = 12.0f;
+    cfg.max_mean_absolute_error = 18.0f;
+    cfg.search_radius = 33;
+    auto excessive_search = estimate_block_motion(
+        {previous.data(), w, h, w}, {current.data(), w, h, w}, cfg);
+    assert(!excessive_search.valid);
+    cfg.search_radius = 4;
+    cfg.block_size = 3;
+    auto tiny_block = estimate_block_motion(
+        {previous.data(), w, h, w}, {current.data(), w, h, w}, cfg);
+    assert(!tiny_block.valid);
+    cfg.block_size = 8;
+    cfg.sample_step = 9;
+    auto oversized_step = estimate_block_motion(
+        {previous.data(), w, h, w}, {current.data(), w, h, w}, cfg);
+    assert(!oversized_step.valid);
     return 0;
 }
