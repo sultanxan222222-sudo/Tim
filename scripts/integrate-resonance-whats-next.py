@@ -64,6 +64,49 @@ def main() -> None:
         '#include "frame_gen.h"\n',
         '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n'
     )
+
+    # The existing frame-generation fragment shader is the only safe insertion point
+    # without introducing another offscreen target or a CPU readback.
+    frame_gen_cpp = root / "core/rend/vulkan/frame_gen.cpp"
+    old_fragment = '''void main()
+{
+	vec4 mo = textureLod(motionTex, uv, 0.0);
+	vec2 m = mo.xy;
+	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
+	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
+	// a poor match (something appearing, a cut): the newer frame as it is
+	float w = smoothstep(0.03, 0.10, mo.z);
+	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
+}'''
+    new_fragment = '''void main()
+{
+	vec4 mo = textureLod(motionTex, uv, 0.0);
+	vec2 m = mo.xy;
+	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
+	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
+	// A poor match (something appearing, a cut): use the newer frame.
+	float w = smoothstep(0.03, 0.10, mo.z);
+	vec3 base = mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb;
+
+	// Mini-DLSS spatial finishing pass: restrained, edge-aware sharpening.
+	// It operates in the existing fragment pass, so no extra image/readback is needed.
+	vec2 texel = 1.0 / vec2(textureSize(curTex, 0));
+	vec3 n = textureLod(curTex, uv + vec2(0.0, -texel.y), 0.0).rgb;
+	vec3 s = textureLod(curTex, uv + vec2(0.0,  texel.y), 0.0).rgb;
+	vec3 e = textureLod(curTex, uv + vec2( texel.x, 0.0), 0.0).rgb;
+	vec3 west = textureLod(curTex, uv + vec2(-texel.x, 0.0), 0.0).rgb;
+	float edge = max(max(abs(dot(base - n, vec3(0.2126, 0.7152, 0.0722))),
+	                     abs(dot(base - s, vec3(0.2126, 0.7152, 0.0722)))),
+	                 max(abs(dot(base - e, vec3(0.2126, 0.7152, 0.0722))),
+	                     abs(dot(base - west, vec3(0.2126, 0.7152, 0.0722)))));
+	float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
+	vec3 avg = (n + s + e + west) * 0.25;
+	vec3 sharpened = base + (base - avg) * (0.12 * edgeGate);
+	vec3 lo = min(min(n, s), min(e, west));
+	vec3 hi = max(max(n, s), max(e, west));
+	color = vec4(clamp(sharpened, lo, hi), 1.0);
+}'''
+    replace_once(frame_gen_cpp, old_fragment, new_fragment)
     replace_once(
         context_h,
         '#include "vulkan.h"\n',
