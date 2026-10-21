@@ -32,6 +32,9 @@ target_link_libraries(frame_generation_controller_test PRIVATE whats_next_histor
 add_executable(frame_generation_bridge_test tests/frame_generation_bridge_test.cpp)
 target_link_libraries(frame_generation_bridge_test PRIVATE whats_next_history)
 
+add_executable(resonance_frame_adapter_test tests/resonance_frame_adapter_test.cpp)
+target_link_libraries(resonance_frame_adapter_test PRIVATE whats_next_history)
+
 # These tests use assert() as their assertion mechanism. CMake's Release
 # configuration normally defines NDEBUG, which would silently compile every
 # assertion out. Explicitly keep assertions active for all test executables.
@@ -41,6 +44,7 @@ set(WHATS_NEXT_TEST_TARGETS
     frame_generation_policy_test
     frame_generation_controller_test
     frame_generation_bridge_test
+    resonance_frame_adapter_test
 )
 foreach(target IN LISTS WHATS_NEXT_TEST_TARGETS)
     if(MSVC)
@@ -56,6 +60,7 @@ add_test(NAME motion_estimator_test COMMAND motion_estimator_test)
 add_test(NAME frame_generation_policy_test COMMAND frame_generation_policy_test)
 add_test(NAME frame_generation_controller_test COMMAND frame_generation_controller_test)
 add_test(NAME frame_generation_bridge_test COMMAND frame_generation_bridge_test)
+add_test(NAME resonance_frame_adapter_test COMMAND resonance_frame_adapter_test)
 
 option(WHATS_NEXT_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer on supported host compilers" OFF)
 if(WHATS_NEXT_ENABLE_SANITIZERS AND NOT MSVC)
@@ -65,7 +70,8 @@ if(WHATS_NEXT_ENABLE_SANITIZERS AND NOT MSVC)
         motion_estimator_test
         frame_generation_policy_test
         frame_generation_controller_test
-        frame_generation_bridge_test)
+        frame_generation_bridge_test
+        resonance_frame_adapter_test)
         target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
         target_link_options(${target} PRIVATE -fsanitize=address,undefined)
     endforeach()
