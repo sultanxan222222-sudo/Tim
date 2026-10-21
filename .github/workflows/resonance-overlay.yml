@@ -36,3 +36,16 @@ jobs:
           grep -q 'whatsNextBridge.begin_real_frame' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'Mini-DLSS spatial finishing pass' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
           test -f /tmp/flycast/core/rend/vulkan/whats_next/shaders/mini_dlss_upscale.comp
+      - name: Compile modified interpolation fragment shader
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('/tmp/flycast/core/rend/vulkan/frame_gen.cpp').read_text()
+          marker = 'const char *const kFragment = R"('
+          start = source.index(marker) + len(marker)
+          end = source.index(')";', start)
+          Path('/tmp/mini_dlss_framegen.frag').write_text(source[start:end])
+          PY
+          glslangValidator -V -S frag /tmp/mini_dlss_framegen.frag -o /tmp/mini_dlss_framegen.spv
