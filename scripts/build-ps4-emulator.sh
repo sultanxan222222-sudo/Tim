@@ -30,9 +30,12 @@ done
 [[ -f "$RESONANCE_DIR/patches/BASE.txt" ]] || fail "Resonance patches/BASE.txt is missing."
 
 # Check every required upstream build script before touching the build tree.
-for script in seed-build-tree.sh build-netfs.sh rebuild-flycast.sh package-resonance.sh; do
+for script in seed-build-tree.sh build-netfs.sh rebuild-flycast.sh package-resonance.sh make-pkg.sh; do
     [[ -f "$RESONANCE_DIR/scripts/$script" ]] || fail "Required Resonance build script is missing: scripts/$script"
 done
+# GitHub checkout can strip executable bits on upstream scripts. package-resonance.sh
+# invokes make-pkg.sh directly, so repair every checked-out helper before packaging.
+find "$RESONANCE_DIR/scripts" -type f -name '*.sh' -exec chmod +x {} +
 [[ -f "$ROOT/scripts/apply-resonance-whats-next.sh" ]] || fail "WHAT'S NEXT overlay script is missing."
 [[ -x "$ROOT/scripts/test-whats-next.sh" || -f "$ROOT/scripts/test-whats-next.sh" ]] || fail "WHAT'S NEXT host test script is missing."
 
