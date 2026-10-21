@@ -33,6 +33,50 @@ def main() -> None:
         raise SystemExit("Not a Resonance-patched Flycast tree: required Vulkan renderer files are missing.")
 
     module = repo / "dreamcast/mini-dlss"
+    frame_gen_cpp = root / "core/rend/vulkan/frame_gen.cpp"
+    old_fragment = '''void main()
+{
+	vec4 mo = textureLod(motionTex, uv, 0.0);
+	vec2 m = mo.xy;
+	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
+	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
+	// a poor match (something appearing, a cut): the newer frame as it is
+	float w = smoothstep(0.03, 0.10, mo.z);
+	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
+}'''
+    # Validate every source-edit anchor before copying files or changing the build tree.
+    preflight_anchors = (
+        (cmake, 'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'),
+        (cmake, '            frame_gen.cpp\n'),
+        (context_cpp, '#include "frame_gen.h"\n'),
+        (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
+        (context_cpp, 'fgPrevExtent == extent;'),
+        (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
+        (context_cpp, '\t\t\tfgDraw = false;\n'),
+        (context_h, '#include "vulkan.h"\n'),
+        (context_h, '\tbool fgRealPending = false;\n'),
+        (frame_gen_cpp, old_fragment),
+    )
+    for path, anchor in preflight_anchors:
+        count = path.read_text(encoding="utf-8").count(anchor)
+        if count != 1:
+            raise SystemExit(
+                f"Preflight failed before editing: expected one anchor in {path}, found {count}: {anchor[:100]!r}"
+            )
+
+    required_module_files = (
+        module / "src/history_gate.cpp",
+        module / "src/frame_generation_policy.cpp",
+        module / "src/frame_generation_controller.cpp",
+        module / "src/frame_generation_bridge.cpp",
+        module / "shaders/edge_aware_sharpen.comp",
+        module / "shaders/mini_dlss_upscale.comp",
+    )
+    missing_files = [path for path in required_module_files if not path.is_file()]
+    if missing_files:
+        raise SystemExit("Preflight failed before editing; required WHAT'S NEXT files missing: "
+                         + ", ".join(str(path) for path in missing_files))
+
     target = root / "core/rend/vulkan/whats_next"
     shutil.copytree(module / "include", target / "include", dirs_exist_ok=True)
     (target / "src").mkdir(parents=True, exist_ok=True)
@@ -67,17 +111,6 @@ def main() -> None:
 
     # The existing frame-generation fragment shader is the only safe insertion point
     # without introducing another offscreen target or a CPU readback.
-    frame_gen_cpp = root / "core/rend/vulkan/frame_gen.cpp"
-    old_fragment = '''void main()
-{
-	vec4 mo = textureLod(motionTex, uv, 0.0);
-	vec2 m = mo.xy;
-	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
-	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
-	// a poor match (something appearing, a cut): the newer frame as it is
-	float w = smoothstep(0.03, 0.10, mo.z);
-	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
-}'''
     new_fragment = '''void main()
 {
 	vec4 mo = textureLod(motionTex, uv, 0.0);
