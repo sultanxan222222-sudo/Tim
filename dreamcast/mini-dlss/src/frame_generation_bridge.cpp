@@ -12,7 +12,13 @@ FrameGenerationDecision FrameGenerationBridge::begin_real_frame(
     std::uint64_t resource_generation,
     std::uint64_t game_session,
     PresentationCadence cadence) noexcept {
-    pending_valid_ = false;
+    // A second begin without a commit means the renderer abandoned an
+    // in-flight source frame. Invalidate temporal history rather than allowing
+    // a decision made for that frame to be committed against a replacement.
+    if (pending_valid_) {
+        controller_.reset();
+        pending_valid_ = false;
+    }
     if (next_frame_id_ == 0 || next_frame_id_ == std::numeric_limits<std::uint64_t>::max()) {
         // Avoid wrapping IDs and accidentally treating stale history as consecutive.
         controller_.reset();
