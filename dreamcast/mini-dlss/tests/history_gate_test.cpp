@@ -28,6 +28,16 @@ int main() {
     new_game.game_session = 2;
     assert(gate.evaluate(new_game) == HistoryDecision::RejectSessionChanged);
 
+    auto format_changed = b;
+    format_changed.frame_id = 3;
+    format_changed.format = PixelFormat::BGRA8;
+    assert(gate.evaluate(format_changed) == HistoryDecision::RejectResourceChanged);
+
+    auto unknown_format = b;
+    unknown_format.frame_id = 3;
+    unknown_format.format = PixelFormat::Unknown;
+    assert(gate.evaluate(unknown_format) == HistoryDecision::RejectInvalidCurrent);
+
     auto dropped = b;
     dropped.frame_id = 4;
     assert(gate.evaluate(dropped) == HistoryDecision::RejectDiscontinuity);
