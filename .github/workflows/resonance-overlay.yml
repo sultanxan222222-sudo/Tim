@@ -41,8 +41,8 @@ jobs:
       - name: Compile WHAT'S NEXT renderer bridge sources
         run: |
           for source in history_gate frame_generation_policy frame_generation_controller frame_generation_bridge; do
-            g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror \\
-              -I /tmp/flycast/core/rend/vulkan/whats_next/include \\
+            g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror \
+              -I /tmp/flycast/core/rend/vulkan/whats_next/include \
               -fsyntax-only "/tmp/flycast/core/rend/vulkan/whats_next/src/${source}.cpp"
           done
       - name: Compile modified interpolation fragment shader
