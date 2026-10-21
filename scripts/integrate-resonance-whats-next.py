@@ -151,6 +151,10 @@ def main() -> None:
         '\tu64 fgResourceGeneration = 1;\n\tu64 fgGameSession = 1;\n\tbool fgWasGuiOpen = false;\n'
     )
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
+    integrated_cmake = cmake.read_text(encoding="utf-8")
+    if "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include" not in integrated_cmake or "\${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include" in integrated_cmake:
+        raise SystemExit("Mini-DLSS CMake include path is malformed.")
+
     integrated_context = context_cpp.read_text(encoding="utf-8")
     required_hooks = (
         "whatsNextBridge.begin_real_frame",
