@@ -8,6 +8,15 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(whats_next_history src/history_gate.cpp src/motion_estimator.cpp src/frame_generation_policy.cpp src/frame_generation_controller.cpp src/frame_generation_bridge.cpp)
 target_include_directories(whats_next_history PUBLIC include)
 
+option(WHATS_NEXT_ENABLE_WARNINGS "Enable strict compiler warnings for the host reference core" ON)
+if(WHATS_NEXT_ENABLE_WARNINGS)
+    if(MSVC)
+        target_compile_options(whats_next_history PRIVATE /W4 /permissive-)
+    else()
+        target_compile_options(whats_next_history PRIVATE -Wall -Wextra -Wpedantic)
+    endif()
+endif()
+
 add_executable(history_gate_test tests/history_gate_test.cpp)
 target_link_libraries(history_gate_test PRIVATE whats_next_history)
 
