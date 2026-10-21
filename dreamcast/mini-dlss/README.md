@@ -6,7 +6,7 @@ This directory contains a backend-neutral C++ core for the coordinated Dreamcast
 
 - Shared frame contract for completed emulator frames.
 - Conservative history gate: rejects invalid frames, stale/non-consecutive frames, and session/resource/size/format changes.
-- Integrated frame-generation controller that evaluates history and cadence as one decision, with an explicit rule that generated frames are never committed as real source history.
+- Integrated frame-generation controller and renderer-facing bridge: real-frame IDs are assigned separately from generated presentation repeats, and only committed real source frames enter temporal history.
 - CPU reference block-motion estimator for tightly packed 8-bit luminance frames. It performs bounded sum-of-absolute-differences matching, rejects flat/low-texture blocks, and attaches a confidence score.
 - Host-side CMake tests for history validation and motion estimation.
 - Unintegrated Vulkan compute shader prototype for spatial edge-aware sharpening.
@@ -42,7 +42,7 @@ ctest --test-dir build --output-on-failure
 
 ## M33-inspired frame-generation scheduling
 
-The host-side control layer includes `whats_next/frame_generation_policy.hpp`, `src/frame_generation_policy.cpp`, and the combined `frame_generation_controller.hpp/.cpp`. It does not render pixels or allocate Vulkan resources. It makes
+The host-side control layer includes `frame_generation_policy.hpp/.cpp`, `frame_generation_controller.hpp/.cpp`, and `frame_generation_bridge.hpp/.cpp`. The bridge assigns IDs only to actual source frames; the renderer must not call `begin_real_frame()` for repeated vblanks or synthesized frames. It does not render pixels or allocate Vulkan resources. It makes
 the safe scheduling decision around a renderer's existing frame-generation path:
 
 - Disabled feature -> bypass and show the real frame.
@@ -51,6 +51,6 @@ the safe scheduling decision around a renderer's existing frame-generation path:
 - Cadence other than exactly two display refresh intervals -> show the real frame.
 - Only enabled + valid accepted history + a two-refresh interval -> permit an intermediate frame.
 
-The decision is covered by `tests/frame_generation_policy_test.cpp` and `tests/frame_generation_controller_test.cpp`; both are added to CMake/CTest.
+The policy, controller, and bridge are covered by dedicated CMake/CTest targets. The bridge's renderer contract is: call `begin_real_frame()` once for each completed real frame, use the returned decision, and call `commit_real_frame()` only after the renderer accepts that real frame; call `reset()` on teardown, game switch, or resource reset.
 
 Important discovery: the actual Resonance PS4 patch already adds `core/rend/vulkan/frame_gen.cpp/.h` and hooks it into `VulkanContext::PresentFrame()` / `DrawFrame()`. It uses GPU coarse/fine motion search and an intermediate Vulkan draw. WHAT'S NEXT should connect its controller to this existing path instead of creating a second renderer. Per Triangle / Per Strip / Per Pixel are alpha-sorting settings, not frame-generation modes. This controller is a tested control layer, not a claim that it is already wired into Resonance.
