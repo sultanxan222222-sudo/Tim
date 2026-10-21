@@ -71,10 +71,8 @@ def main() -> None:
         '#ifdef __ORBIS__\n\tbool sourceAccepted = false;\n\t// a new frame from the renderer'
     )
 
-    gate_pattern = r"(?m)^[ \\t]*interpolate = config::FrameGeneration.*?fgPrevExtent == extent;"
-    new_gate = """\\t\\tconst bool eligible = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
-\\t\\t\\t\\t&& !settings.input.fastForwardMode && fgStreak >= 3 && fgPrevView && fgPrevView != imageView
-\\t\\t\\t\\t&& fgPrevExtent == extent;
+    bridge_gate = '''\\t\\t\\t\\t&& fgPrevExtent == extent;
+\\t\\tconst bool eligible = interpolate;
 \\t\\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
 \\t\\t{
 \\t\\t\\t++fgResourceGeneration;
@@ -84,12 +82,8 @@ def main() -> None:
 \\t\\t\\t\\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
 \\t\\t\\t\\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
 \\t\\t\\t\\t\\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
-\\t\\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;"""
-    gate_matches = re.findall(gate_pattern, context_cpp.read_text(encoding="utf-8"), flags=re.S)
-    if len(gate_matches) != 1:
-        raise SystemExit(f"Expected one interpolation gate in {context_cpp}, found {len(gate_matches)}")
-    data = context_cpp.read_text(encoding="utf-8")
-    context_cpp.write_text(re.sub(gate_pattern, new_gate, data, count=1, flags=re.S), encoding="utf-8")
+\\t\\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;'''
+    replace_once(context_cpp, '\\t\\t\\t\\t&& fgPrevExtent == extent;\\n', bridge_gate + '\\n')
 
     replace_once(
         context_cpp,
