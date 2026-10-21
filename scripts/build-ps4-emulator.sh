@@ -89,8 +89,17 @@ for dep in libnfs libsmb2; do
         [[ ! -e "$PS4_BUILD_ROOT/src/$dep" ]] || fail "$PS4_BUILD_ROOT/src/$dep exists but is not a Git checkout."
         git clone "$url" "$PS4_BUILD_ROOT/src/$dep"
     fi
-    git -C "$PS4_BUILD_ROOT/src/$dep" fetch --quiet origin "$sha"
-    git -C "$PS4_BUILD_ROOT/src/$dep" checkout --detach "$sha"
+    DEP_SRC="$PS4_BUILD_ROOT/src/$dep"
+    DEP_REMOTE="$(git -C "$DEP_SRC" remote get-url origin 2>/dev/null || true)"
+    case "$dep:$DEP_REMOTE" in
+        "libnfs:https://github.com/sahlberg/libnfs"|"libnfs:https://github.com/sahlberg/libnfs.git"|"libnfs:git@github.com:sahlberg/libnfs.git"|"libsmb2:https://github.com/sahlberg/libsmb2"|"libsmb2:https://github.com/sahlberg/libsmb2.git"|"libsmb2:git@github.com:sahlberg/libsmb2.git") ;;
+        *) fail "$DEP_SRC has an unexpected origin: $DEP_REMOTE" ;;
+    esac
+    git -C "$DEP_SRC" fetch --quiet origin "$sha"
+    # build-netfs.sh patches libsmb2's CMakeLists.txt locally; reset only these
+    # dedicated dependency trees so every build starts from the exact pinned source.
+    git -C "$DEP_SRC" reset --hard "$sha"
+    git -C "$DEP_SRC" clean -ffd
 done
 
 step "3/7 — Apply Resonance PS4 patch and WHAT'S NEXT overlay"
