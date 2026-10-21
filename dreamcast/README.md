@@ -6,9 +6,9 @@ This directory tracks the Dreamcast/Flycast enhancement work alongside the exist
 
 A coordinated enhancement stack for Dreamcast games on a PS4 Pro running Flycast:
 - WHAT'S NEXT: frame history, motion estimation/reuse experiments, and history invalidation.
-- Mini-DLSS: spatial reconstruction/sharpening experiments and later optional temporal reconstruction.
-- Flycast integration: the actual renderer/API adapter, to be identified from the selected PS4 Flycast source/build.
-- Game library and saves: later integration points; game discovery and save-state handling must use Flycast/platform-supported interfaces.
+- Mini-DLSS: a conservative spatial finishing pass on normal and generated presentation frames; the standalone compute upscaler remains a later stage.
+- Flycast integration: the renderer adapter is applied to Resonance's pinned Flycast Vulkan path.
+- Game library and saves: reuse Resonance/Flycast game discovery and save-state interfaces rather than duplicating them.
 
 ## Integration rules
 
