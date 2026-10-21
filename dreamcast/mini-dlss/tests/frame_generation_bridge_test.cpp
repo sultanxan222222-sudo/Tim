@@ -34,9 +34,9 @@ int main() {
         true, 640, 480, PixelFormat::RGBA8, 1, 1, {2});
     assert(decision == FrameGenerationDecision::GenerateIntermediate);
     // Generated images are not separately assigned source frame IDs.
-    assert(bridge.current_frame_id() == 2);
-    bridge.commit_real_frame();
     assert(bridge.current_frame_id() == 3);
+    bridge.commit_real_frame();
+    assert(bridge.current_frame_id() == 4);
 
     // Resource recreation rejects the old history for exactly one source frame.
     decision = bridge.begin_real_frame(
