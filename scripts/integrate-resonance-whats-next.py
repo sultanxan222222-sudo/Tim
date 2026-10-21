@@ -48,6 +48,43 @@ def main() -> None:
 	float w = smoothstep(0.03, 0.10, mo.z);
 	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
 }'''
+    # Mini-DLSS variant of Flycast's ordinary presentation quad. It preserves the
+    # existing alpha/colour logic when MINI_DLSS=0 and adds only conservative sharpening
+    # when MINI_DLSS=1. The generated-frame fragment has its corresponding pass above.
+    quad_fragment_original = '''#if IGNORE_TEX_ALPHA == 1
+\tFragColor.rgb = pushConstants.color.rgb * texture(tex, inUV).rgb;
+\tFragColor.a = pushConstants.color.a;
+#else
+\tFragColor = pushConstants.color * texture(tex, inUV);
+#endif'''
+    quad_fragment_enhanced = '''vec4 sourceColor = texture(tex, inUV);
+#if MINI_DLSS == 1
+\tvec2 texel = 1.0 / vec2(textureSize(tex, 0));
+\tvec3 base = sourceColor.rgb;
+\tvec3 n = texture(tex, inUV + vec2(0.0, -texel.y)).rgb;
+\tvec3 s = texture(tex, inUV + vec2(0.0,  texel.y)).rgb;
+\tvec3 e = texture(tex, inUV + vec2( texel.x, 0.0)).rgb;
+\tvec3 west = texture(tex, inUV + vec2(-texel.x, 0.0)).rgb;
+\tfloat lumaB = dot(base, vec3(0.2126, 0.7152, 0.0722));
+\tfloat edge = max(
+\t\tmax(abs(lumaB - dot(n, vec3(0.2126, 0.7152, 0.0722))),
+\t\t    abs(lumaB - dot(s, vec3(0.2126, 0.7152, 0.0722)))),
+\t\tmax(abs(lumaB - dot(e, vec3(0.2126, 0.7152, 0.0722))),
+\t\t    abs(lumaB - dot(west, vec3(0.2126, 0.7152, 0.0722)))));
+\tfloat edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
+\tvec3 average = (n + s + e + west) * 0.25;
+\tvec3 sharpened = base + (base - average) * (0.12 * edgeGate);
+\tvec3 lo = min(base, min(min(n, s), min(e, west)));
+\tvec3 hi = max(base, max(max(n, s), max(e, west)));
+\tsourceColor.rgb = clamp(sharpened, lo, hi);
+#endif
+#if IGNORE_TEX_ALPHA == 1
+\tFragColor.rgb = pushConstants.color.rgb * sourceColor.rgb;
+\tFragColor.a = pushConstants.color.a;
+#else
+\tFragColor = pushConstants.color * sourceColor;
+#endif'''
+
     # Validate every source-edit anchor before copying files or changing the build tree.
     preflight_anchors = (
         (cmake, 'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'),
@@ -60,6 +97,22 @@ def main() -> None:
         (context_h, '#include "vulkan.h"\n'),
         (context_h, '\tbool fgRealPending = false;\n'),
         (frame_gen_cpp, old_fragment),
+        (shaders_cpp, quad_fragment_original),
+        (shaders_cpp, 'vk::UniqueShaderModule ShaderManager::compileQuadFragmentShader(bool ignoreTexAlpha)\n'),
+        (shaders_h, 'vk::ShaderModule GetQuadFragmentShader(bool ignoreTexAlpha)\n'),
+        (shaders_h, '\t\tquadNoAlphaFragmentShader.reset();\n'),
+        (shaders_h, '\tvk::UniqueShaderModule compileQuadFragmentShader(bool ignoreTexAlpha);\n'),
+        (shaders_h, '\tvk::UniqueShaderModule quadNoAlphaFragmentShader;\n'),
+        (quad_h, '\tQuadPipeline(bool ignoreTexAlpha, bool rotate = false)\n'),
+        (quad_h, '\tbool ignoreTexAlpha;\n'),
+        (quad_cpp, 'shaderManager->GetQuadFragmentShader(ignoreTexAlpha), "main")'),
+        (context_cpp, 'quadRotateDrawer = std::make_unique<QuadDrawer>();\n'),
+        (context_cpp, 'quadRotateDrawer->Init(quadRotatePipeline.get());\n'),
+        (context_cpp, '\tif (config::Rotate90)\n\t\tquadRotatePipeline->BindPipeline(commandBuffer);\n\telse\n\t\tquadPipeline->BindPipeline(commandBuffer);\n'),
+        (context_cpp, '\tif (fgDraw && frameGen != nullptr)\n\t\tframeGen->Draw(commandBuffer, *renderPass);\n\telse if (config::Rotate90)\n\t\tquadRotateDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n\telse\n\t\tquadDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'),
+        (context_cpp, '\tquadDrawer.reset();\n'),
+        (context_h, '\tstd::unique_ptr<QuadPipeline> quadRotatePipeline;\n'),
+        (context_h, '\tstd::unique_ptr<QuadDrawer> quadRotateDrawer;\n'),
     )
     for path, anchor in preflight_anchors:
         count = path.read_text(encoding="utf-8").count(anchor)
