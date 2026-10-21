@@ -13,7 +13,7 @@ The GitHub Actions workflow `Resonance overlay compatibility` clones that exact 
 ## Remaining work
 
 - Compile the integrated Vulkan target with Resonance's PS4 toolchain.
-- Verify the actual presentation image format; the adapter currently declares RGBA8 and that assumption must be checked against the renderer.
+- [x] Confirmed the source-frame format at the pinned Flycast base: `BaseVulkanRenderer::RenderFramebuffer()` creates `TextureType::_8888`, mapped in `Texture::UploadToGPU()` to `vk::Format::eR8G8B8A8Unorm`, matching the RGBA8 frame contract.
 - The standalone `mini_dlss_upscale.comp` remains a separate compute upscaler prototype; it is staged in the renderer tree but is not yet wired to an offscreen Vulkan target. The current live path is spatial sharpening, not neural or temporal reconstruction.
 - The ordinary-frame and generated-frame shader variants both compile in CI, but the full Vulkan C++ target has not yet been compiled using the PS4 toolchain.
 - Verify the actual image format/resource lifecycle and test latency, visual artifacts, memory use, and frame pacing on PS4 Pro before claiming a finished PKG.
