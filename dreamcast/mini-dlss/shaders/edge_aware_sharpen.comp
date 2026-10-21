@@ -1,0 +1,49 @@
+#version 450
+
+// First spatial Mini-DLSS experiment: conservative edge-aware sharpening.
+// This is not temporal reconstruction and does not invent missing geometry.
+// Descriptor bindings must be wired by the Vulkan adapter before use.
+layout(set = 0, binding = 0) uniform sampler2D source_image;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D destination_image;
+
+layout(push_constant) uniform SharpenParams {
+    ivec2 extent;
+    float strength;
+    float edge_threshold;
+} params;
+
+layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+float luminance(vec3 c) {
+    return dot(c, vec3(0.2126, 0.7152, 0.0722));
+}
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    if (any(greaterThanEqual(p, params.extent))) {
+        return;
+    }
+
+    vec2 uv = (vec2(p) + vec2(0.5)) / vec2(params.extent);
+    vec2 texel = 1.0 / vec2(params.extent);
+
+    vec4 center = texture(source_image, uv);
+    vec3 north = texture(source_image, uv + vec2(0.0, -texel.y)).rgb;
+    vec3 south = texture(source_image, uv + vec2(0.0,  texel.y)).rgb;
+    vec3 west  = texture(source_image, uv + vec2(-texel.x, 0.0)).rgb;
+    vec3 east  = texture(source_image, uv + vec2( texel.x, 0.0)).rgb;
+
+    float edge = max(
+        max(abs(luminance(center.rgb) - luminance(north)),
+            abs(luminance(center.rgb) - luminance(south))),
+        max(abs(luminance(center.rgb) - luminance(west)),
+            abs(luminance(center.rgb) - luminance(east)))
+    );
+
+    float edge_gate = smoothstep(params.edge_threshold, params.edge_threshold * 3.0 + 0.0001, edge);
+    vec3 local_average = (north + south + west + east) * 0.25;
+    float amount = clamp(params.strength, 0.0, 0.35) * (1.0 - edge_gate);
+    vec3 sharpened = center.rgb + (center.rgb - local_average) * amount;
+
+    imageStore(destination_image, p, vec4(clamp(sharpened, 0.0, 1.0), center.a));
+}
