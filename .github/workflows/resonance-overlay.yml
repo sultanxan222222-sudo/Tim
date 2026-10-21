@@ -3,13 +3,15 @@ name: Resonance overlay compatibility
 on:
   push:
     paths:
+      - "dreamcast/mini-dlss/**"
       - "dreamcast/patches/**"
-      - "scripts/apply-resonance-whats-next.sh"
+      - "scripts/integrate-resonance-whats-next.py"
       - ".github/workflows/resonance-overlay.yml"
   pull_request:
     paths:
+      - "dreamcast/mini-dlss/**"
       - "dreamcast/patches/**"
-      - "scripts/apply-resonance-whats-next.sh"
+      - "scripts/integrate-resonance-whats-next.py"
       - ".github/workflows/resonance-overlay.yml"
   workflow_dispatch:
 
@@ -25,11 +27,9 @@ jobs:
           git clone --depth 1 https://github.com/iHaiDeeZ/Resonance.git /tmp/resonance
       - name: Apply Resonance PS4 patch
         run: git -C /tmp/flycast apply /tmp/resonance/patches/flycast-ps4.patch
-      - name: Check WHAT'S NEXT integration patch
-        run: git -C /tmp/flycast apply --check "$GITHUB_WORKSPACE/dreamcast/patches/resonance-whats-next.patch"
-      - name: Apply WHAT'S NEXT integration patch
-        run: git -C /tmp/flycast apply "$GITHUB_WORKSPACE/dreamcast/patches/resonance-whats-next.patch"
-      - name: Verify integration sources and build registration
+      - name: Integrate WHAT'S NEXT into renderer
+        run: python3 scripts/integrate-resonance-whats-next.py /tmp/flycast
+      - name: Verify integration sources and registration
         run: |
           test -f /tmp/flycast/core/rend/vulkan/whats_next/src/frame_generation_bridge.cpp
           grep -q 'whats_next/src/frame_generation_bridge.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
