@@ -46,6 +46,7 @@ int main() {
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 2, 1, {2});
     assert(decision == FrameGenerationDecision::GenerateIntermediate);
+    bridge.commit_real_frame();
 
     // A game/session switch must also invalidate temporal history.
     decision = bridge.begin_real_frame(
