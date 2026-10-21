@@ -430,7 +430,7 @@ diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_conte
 +		const bool eligible = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
 +				&& !settings.input.fastForwardMode && fgStreak >= 3 && fgPrevView && fgPrevView != imageView
 +				&& fgPrevExtent == extent;
-+		if (extent != fgPrevExtent && fgPrevExtent.width != 0)
++		if ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
 +		{
 +			++fgResourceGeneration;
 +			whatsNextBridge.reset();
@@ -438,7 +438,7 @@ diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_conte
 +		const auto decision = whatsNextBridge.begin_real_frame(
 +				eligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
 +				fgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
-+					static_cast<std::uint32_t>(std::min<u64>(gap, UINT32_MAX))});
++					(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
 +		interpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
  		prevView = fgPrevView;
  		fgPrevView = imageView;
@@ -464,6 +464,9 @@ diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_conte
 diff --git a/core/rend/vulkan/vulkan_context.h b/core/rend/vulkan/vulkan_context.h
 --- a/core/rend/vulkan/vulkan_context.h
 +++ b/core/rend/vulkan/vulkan_context.h
+@@ -20,1 +20,2 @@
+ #include "vulkan.h"
++#include "whats_next/frame_generation_bridge.hpp"
 @@ -286,3 +286,7 @@ private:
  	bool fgDraw = false;
  	bool fgRealPending = false;
