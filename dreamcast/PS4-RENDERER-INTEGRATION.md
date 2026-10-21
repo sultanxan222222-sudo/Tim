@@ -30,7 +30,9 @@ Do not duplicate Resonance's existing game scanner, VMU saves, or save-state UI 
 
 ## Status and limitations
 
-This is source reconnaissance, not a completed integration. The PS4 toolchain/sysroot and console are not available in this workspace, so a real PS4 build and performance test have not been performed. No PKG is produced by this change.
+The repository now contains a renderer integration script and a repeatable PS4 build driver. CI applies the overlay to the Flycast revision pinned by Resonance, compiles the WHAT'S NEXT C++ lifecycle modules, and compiles both the ordinary-frame Mini-DLSS fragment shader and the generated-frame fragment shader. Host contract tests, sanitizer tests, and shader validation pass.
+
+A full PS4 Vulkan target build still has not been completed here: it depends on the local Crema/DolphinPS4 sysroot, RADV build tree, and OpenOrbis packaging tools. No PKG has been produced from this integration and no on-console image-quality or performance test has been performed. The integrated Mini-DLSS pass is spatial sharpening, not neural DLSS.
 
 
 ## Source-level renderer findings (Flycast)
@@ -54,4 +56,6 @@ Reviewed upstream Flycast's `core/rend/vulkan/vulkan_renderer.cpp` and `vulkan_r
 
 - Added a backend-neutral `FrameGenerationPolicy`, `FrameGenerationController`, and renderer-facing `FrameGenerationBridge` in Tim. The bridge assigns monotonically increasing IDs to real source frames, rejects invalid/stale history and changed resources/sessions, and exposes explicit reset/commit operations. Generated presentation repeats must not be counted as new source frames.
 - Added source and dedicated tests to CMake/CTest. GitHub Actions completed successfully after adding the bridge: [host build and tests](https://github.com/sultanxan222222-sudo/Tim/actions/runs/39655087127).
-- The actual Resonance patch already contains the Vulkan frame-generation implementation; WHAT'S NEXT's `FrameContract`, `HistoryGate`, `FrameGenerationPolicy`, `FrameGenerationController`, and `FrameGenerationBridge` are still host-side modules and are not yet wired into `VulkanContext::PresentFrame()`. The latest GitHub Actions host workflow successfully configured, built, and ran all CTest targets, including the new bridge test. This is a host build, not a PS4 toolchain build. No PS4 build or PKG has been produced.
+- The integration script now wires WHAT'S NEXT's `FrameGenerationBridge` into `VulkanContext::PresentFrame()`: it starts a contract for each real source frame, invalidates history when the render extent/session changes, and commits only on the accepted source-frame path. Existing Resonance GPU frame interpolation remains the generator; WHAT'S NEXT does not add a competing frame generator.
+- The Mini-DLSS spatial finish is now applied to both the generated intermediate-frame fragment shader and a separate ordinary-frame quad shader variant. The ordinary path uses dedicated PS4 presentation pipelines only while the existing Frame Generation setting is enabled; the normal UI/overlay shader path is left unchanged.
+- GitHub Actions validates the pinned source overlay, compiles the bridge C++ modules, compiles both modified fragment shaders, and separately builds/runs the host tests with sanitizers. This is source-level/host validation, not a PS4 toolchain build. No PKG has been produced yet.
