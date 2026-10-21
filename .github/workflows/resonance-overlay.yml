@@ -39,6 +39,8 @@ jobs:
           grep -q 'vec3 hi = max(base' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
           grep -q 'quadMiniDlssDrawer->Draw' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'quadRotateMiniDlssDrawer->Draw' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
+          grep -q '++fgResourceGeneration' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
+          grep -q 'fgPrevExtent = vk::Extent2D()' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'MINI_DLSS' /tmp/flycast/core/rend/vulkan/shaders.cpp
           grep -q 'quadMiniDlssFragmentShader' /tmp/flycast/core/rend/vulkan/shaders.h
           git -C /tmp/flycast diff --check
