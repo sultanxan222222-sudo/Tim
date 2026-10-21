@@ -48,7 +48,7 @@ def main() -> None:
         cmake,
         'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n',
         'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'
-        'target_include_directories(${PROJECT_NAME} PRIVATE "\${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include")\n'
+        'target_include_directories(${PROJECT_NAME} PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include")\n'
     )
     replace_once(
         cmake,
