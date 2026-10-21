@@ -35,9 +35,14 @@ def main() -> None:
     module = repo / "dreamcast/mini-dlss"
     target = root / "core/rend/vulkan/whats_next"
     shutil.copytree(module / "include", target / "include", dirs_exist_ok=True)
+    (target / "src").mkdir(parents=True, exist_ok=True)
     for name in ("history_gate.cpp", "frame_generation_policy.cpp",
                  "frame_generation_controller.cpp", "frame_generation_bridge.cpp"):
-        shutil.copy2(module / "src" / name, target / "src" / name) if (target / "src").mkdir(parents=True, exist_ok=True) is None else None
+        shutil.copy2(module / "src" / name, target / "src" / name)
+    shader_target = target / "shaders"
+    shader_target.mkdir(parents=True, exist_ok=True)
+    for name in ("edge_aware_sharpen.comp", "mini_dlss_upscale.comp"):
+        shutil.copy2(module / "shaders" / name, shader_target / name)
 
     replace_once(
         cmake,
