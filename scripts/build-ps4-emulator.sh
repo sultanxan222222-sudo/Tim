@@ -124,6 +124,17 @@ grep -q 'Mini-DLSS spatial finishing pass' "$FLYCAST_SRC/core/rend/vulkan/frame_
 step "4/7 — Seed PS4 build tree"
 bash "$RESONANCE_DIR/scripts/seed-build-tree.sh" 2>&1 | tee "$LOG_DIR/seed-build-tree.log"
 
+# Resonance carries PS4/FreeBSD ABI shims for OpenOrbis headers (notably
+# sockaddr_in6.sin6_len). Merge them into the seeded sysroot before libnfs/libsmb2
+# are configured, while preserving DolphinPS4-only overlay headers.
+OVERLAY_SRC="$RESONANCE_DIR/toolchain/libc-overlay"
+OVERLAY_DST="$PS4_BUILD_ROOT/sysroot/libc-overlay"
+[[ -f "$OVERLAY_SRC/netinet/in.h" && -f "$OVERLAY_SRC/sys/socket.h" ]] || fail "Resonance PS4 libc overlay is incomplete."
+mkdir -p "$OVERLAY_DST"
+cp -a "$OVERLAY_SRC/." "$OVERLAY_DST/"
+grep -q 'sin6_len' "$OVERLAY_DST/netinet/in.h" || fail "PS4 socket ABI overlay did not install sockaddr_in6.sin6_len."
+grep -q 'struct sockaddr_in6' "$OVERLAY_DST/netinet/in.h" || fail "PS4 IPv6 socket declaration is missing."
+
 step "5/7 — Build network filesystem dependencies"
 bash "$RESONANCE_DIR/scripts/build-netfs.sh" 2>&1 | tee "$LOG_DIR/build-netfs.log"
 
