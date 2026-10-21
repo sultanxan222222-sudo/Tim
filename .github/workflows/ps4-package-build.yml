@@ -37,6 +37,22 @@ jobs:
       - name: Check out WHAT'S NEXT
         uses: actions/checkout@v4
 
+      - name: Restore PS4 toolchain and RADV cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+          /home/runner/dolphinps4-build/sysroot
+          /home/runner/dolphinps4-build/build/libcxx
+          /home/runner/dolphinps4-build/build/runtime
+          /home/runner/dolphinps4-build/build/mesa
+          /home/runner/dolphinps4-build/src/llvm-project-21.1.6.src
+          /home/runner/dolphinps4-build/src/mesa
+          /home/runner/dolphinps4-build/src/libdrm
+          /home/runner/dolphinps4-build/mesa-venv
+          key: ps4-toolchain-v1-${{ github.run_id }}
+          restore-keys: |
+            ps4-toolchain-v1-
+
       - name: Free space and install build prerequisites
         shell: bash
         run: |
@@ -108,17 +124,36 @@ jobs:
         run: |
           git ls-remote --exit-code --tags https://gitlab.freedesktop.org/mesa/mesa.git refs/tags/mesa-26.0.8
           git ls-remote --exit-code --tags https://gitlab.freedesktop.org/mesa/drm.git refs/tags/libdrm-2.4.125
-          git clone --depth 1 --branch mesa-26.0.8 https://gitlab.freedesktop.org/mesa/mesa.git "$CRM/src/mesa"
+          if [[ -d "$CRM/src/mesa/.git" ]]; then
+            if git -C "$CRM/src/mesa" apply --reverse --check "$DOLPHIN_PS4_SOURCE/patches/mesa-ps4.patch" >/dev/null 2>&1; then
+              git -C "$CRM/src/mesa" apply --reverse "$DOLPHIN_PS4_SOURCE/patches/mesa-ps4.patch"
+            fi
+            git -C "$CRM/src/mesa" fetch --quiet origin refs/tags/mesa-26.0.8
+            git -C "$CRM/src/mesa" checkout --detach FETCH_HEAD
+            git -C "$CRM/src/mesa" clean -ffd
+          else
+            git clone --depth 1 --branch mesa-26.0.8 https://gitlab.freedesktop.org/mesa/mesa.git "$CRM/src/mesa"
+          fi
           git -C "$CRM/src/mesa" apply "$DOLPHIN_PS4_SOURCE/patches/mesa-ps4.patch"
-          git clone --depth 1 --branch libdrm-2.4.125 https://gitlab.freedesktop.org/mesa/drm.git "$CRM/src/libdrm"
+          if [[ -d "$CRM/src/libdrm/.git" ]]; then
+            git -C "$CRM/src/libdrm" fetch --quiet origin refs/tags/libdrm-2.4.125
+            git -C "$CRM/src/libdrm" checkout --detach FETCH_HEAD
+            git -C "$CRM/src/libdrm" clean -ffd
+          else
+            git clone --depth 1 --branch libdrm-2.4.125 https://gitlab.freedesktop.org/mesa/drm.git "$CRM/src/libdrm"
+          fi
 
       - name: Build PS4 RADV Vulkan driver
         shell: bash
         run: |
           python3 -m venv "$CRM/mesa-venv"
-          "$CRM/mesa-venv/bin/pip" install --upgrade pip meson mako pyyaml
+          "$CRM/mesa-venv/bin/pip" install --upgrade pip meson mako pyyaml packaging
+          MESA_ARGS=()
+          if [[ ! -f "$CRM/build/mesa/build.ninja" ]]; then
+            MESA_ARGS=(setup)
+          fi
           PS4_BUILD_ROOT="$CRM" OPENORBIS="$OPENORBIS" JOBS="$JOBS" \
-            bash "$DOLPHIN_PS4_SOURCE/scripts/build-mesa.sh" setup 2>&1 | tee "$CRM/logs/build-mesa.log"
+            bash "$DOLPHIN_PS4_SOURCE/scripts/build-mesa.sh" "${MESA_ARGS[@]}" 2>&1 | tee "$CRM/logs/build-mesa.log"
           test -s "$CRM/build/mesa/src/amd/vulkan/libvulkan_radeon.a"
           find "$CRM/build/mesa" -name '*.a' | wc -l
 
@@ -173,3 +208,19 @@ jobs:
           path: ${{ runner.temp }}/ps4-build-logs
           if-no-files-found: warn
           retention-days: 7
+
+      - name: Save PS4 toolchain and RADV cache
+        if: always()
+        continue-on-error: true
+        uses: actions/cache/save@v4
+        with:
+          path: |
+          /home/runner/dolphinps4-build/sysroot
+          /home/runner/dolphinps4-build/build/libcxx
+          /home/runner/dolphinps4-build/build/runtime
+          /home/runner/dolphinps4-build/build/mesa
+          /home/runner/dolphinps4-build/src/llvm-project-21.1.6.src
+          /home/runner/dolphinps4-build/src/mesa
+          /home/runner/dolphinps4-build/src/libdrm
+          /home/runner/dolphinps4-build/mesa-venv
+          key: ps4-toolchain-v1-${{ github.run_id }}
