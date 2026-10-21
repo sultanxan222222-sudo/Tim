@@ -31,3 +31,27 @@ Do not duplicate Resonance's existing game scanner, VMU saves, or save-state UI 
 ## Status and limitations
 
 This is source reconnaissance, not a completed integration. The PS4 toolchain/sysroot and console are not available in this workspace, so a real PS4 build and performance test have not been performed. No PKG is produced by this change.
+
+
+## Source-level renderer findings (Flycast)
+
+Reviewed upstream Flycast's `core/rend/vulkan/vulkan_renderer.cpp` and `vulkan_renderer.h` at the source revision returned by GitHub search, plus Resonance's README/settings strings.
+
+- Flycast's `BaseVulkanRenderer::RenderFramebuffer()` currently calls `ReadFramebuffer(info, pb, width, height)` into a CPU `PixelBuffer`, then uploads that image into a GPU `Texture`. This is not a good insertion point for real-time motion interpolation: the CPU readback/upload is already a costly path and can introduce a stall.
+- The Vulkan presentation path later calls `BaseVulkanRenderer::presentFramebuffer()`, which hands `fbTexture->GetImage()` and its image view to `VulkanContext::PresentFrame()`. The actual renderer-specific `Present()` path is therefore the first place to trace for a GPU-resident integration; we must preserve image layouts, synchronization, swapchain lifetime, and overlay ordering.
+- Important discovery: **Resonance already advertises an experimental Frame Generation feature** in its settings. Its user-facing description says it targets 30 FPS games, generates a picture between frames, can wobble around moving edges, and adds some input lag. Its settings also expose Per Triangle / Per Strip / Per Pixel quality modes. Therefore we must inspect and reuse or improve Resonance's existing implementation rather than bolt on a second competing frame generator.
+- The exact pinned Flycast base used by Resonance is recorded in `patches/BASE.txt` as `0d9853df9`. Upstream source search results can differ from that pinned revision; any final patch must be based on the pinned revision and the actual PS4 patch.
+
+## Updated integration decision
+
+1. Audit Resonance's existing frame-generation implementation first; avoid duplicating its UI, timing detector, and interpolation passes.
+2. Place WHAT'S NEXT's `FrameContract`, `HistoryGate`, and new `FrameGenerationPolicy` around that existing path as a conservative control layer: reject stale history after resize, resource recreation, game switch, dropped frames, or unsupported cadence.
+3. Compare M33's block-motion + half-warp + error-gated cross-fade against Resonance's Per Triangle / Per Strip / Per Pixel methods. M33 is a reference option, not automatically the better algorithm.
+4. Prefer the existing GPU-resident frame/image path. Do not insert a CPU full-frame readback pass into the normal game-present loop.
+5. Keep the original presentation path as the fail-safe; frame generation remains optional until frame-time and input-latency tests on PS4 Pro.
+
+## Current implementation status
+
+- Added a backend-neutral `FrameGenerationPolicy` API and host test source in Tim. It selects a generated intermediate only when the option is enabled, history is accepted, and the observed cadence is exactly two display refresh intervals; otherwise it directs the caller to present the real frame.
+- Added the new source and test target to the CMake project.
+- This is scheduling/control logic only. It is not yet wired into Resonance/Flycast's C++ renderer, and the new test target has not yet been compiled or run. No PS4 build or PKG has been produced.
