@@ -22,7 +22,7 @@ step() { printf '\n========== %s ==========\n' "$*"; }
 
 [[ "$VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]] || fail "RESONANCE_VERSION must use XX.YY format (for example 01.00)."
 [[ "$(readlink -m "$PS4_BUILD_ROOT")" == "$(readlink -m "$EXPECTED_BUILD_ROOT")" ]] || fail "Resonance log/build helpers are pinned to $EXPECTED_BUILD_ROOT; set PS4_BUILD_ROOT to that path."
-for cmd in git python3 cmake ninja; do
+for cmd in git python3 cmake ninja clang-21 clang++-21 ld.lld-21 llvm-ar-21 llvm-ranlib-21; do
     command -v "$cmd" >/dev/null 2>&1 || fail "Required command is missing: $cmd"
 done
 [[ -d "$RESONANCE_DIR/.git" ]] || fail "Resonance checkout not found at $RESONANCE_DIR. Set RESONANCE_DIR to the existing Resonance Git checkout."
@@ -64,7 +64,7 @@ if [[ -L "$HOME/resonance" && "$(readlink -f "$HOME/resonance")" != "$(readlink 
     fail "$HOME/resonance points to a different checkout. Set up the expected symlink manually; this script will not replace it."
 fi
 BASE="$(awk '$1 == "base:" {print $2; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
-[[ -n "$BASE" ]] || fail "Could not read the pinned Flycast revision from patches/BASE.txt."
+[[ "$BASE" =~ ^[0-9a-f]{9,40}$ ]] || fail "Could not read a valid pinned Flycast revision from patches/BASE.txt: $BASE"
 if [[ ! -d "$FLYCAST_SRC/.git" ]]; then
     [[ ! -e "$FLYCAST_SRC" ]] || fail "$FLYCAST_SRC exists but is not a Git checkout; move it aside before cloning."
     git clone --recursive https://github.com/flyinghead/flycast.git "$FLYCAST_SRC" 2>&1 | tee "$LOG_DIR/clone-flycast.log"
@@ -83,7 +83,8 @@ git -C "$FLYCAST_SRC" submodule update --init --recursive
 for dep in libnfs libsmb2; do
     url="$(awk -v name="$dep" '$1 == name ":" {print $3; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
     sha="$(awk -v name="$dep" '$1 == name ":" {print $2; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
-    [[ -n "$url" && -n "$sha" ]] || fail "Could not read pinned $dep source from patches/BASE.txt."
+    [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || fail "Could not read a valid pinned $dep revision from patches/BASE.txt: $sha"
+    [[ "$url" =~ ^https://github\.com/[^[:space:]]+$ ]] || fail "Could not read a valid HTTPS GitHub URL for $dep from patches/BASE.txt: $url"
     if [[ ! -d "$PS4_BUILD_ROOT/src/$dep/.git" ]]; then
         [[ ! -e "$PS4_BUILD_ROOT/src/$dep" ]] || fail "$PS4_BUILD_ROOT/src/$dep exists but is not a Git checkout."
         git clone "$url" "$PS4_BUILD_ROOT/src/$dep"
