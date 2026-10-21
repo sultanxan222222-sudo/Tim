@@ -2,15 +2,27 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 #include <limits>
-#include <cmath>
 
 namespace whats_next {
 namespace {
 
 bool valid_image(const GrayImageView& image) noexcept {
-    return image.pixels && image.width > 0 && image.height > 0 &&
-           image.stride >= image.width;
+    if (!image.pixels || image.width == 0 || image.height == 0 ||
+        image.stride < image.width)
+        return false;
+
+    // Search offsets use signed int; reject dimensions that cannot be represented.
+    if (image.width > static_cast<std::uint32_t>(std::numeric_limits<int>::max()) ||
+        image.height > static_cast<std::uint32_t>(std::numeric_limits<int>::max()))
+        return false;
+
+    // Ensure the last addressed pixel index is representable in size_t.
+    const std::size_t last_column = static_cast<std::size_t>(image.width - 1);
+    const std::size_t last_row = static_cast<std::size_t>(image.height - 1);
+    return last_row <= (std::numeric_limits<std::size_t>::max() - last_column) /
+                           image.stride;
 }
 
 double block_variance(const GrayImageView& image, std::uint32_t x,
