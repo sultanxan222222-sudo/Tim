@@ -37,6 +37,11 @@ jobs:
           grep -q 'Mini-DLSS spatial finishing pass' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
           grep -q 'vec3 lo = min(base' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
           grep -q 'vec3 hi = max(base' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
+          grep -q 'quadMiniDlssDrawer->Draw' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
+          grep -q 'quadRotateMiniDlssDrawer->Draw' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
+          grep -q 'MINI_DLSS' /tmp/flycast/core/rend/vulkan/shaders.cpp
+          grep -q 'quadMiniDlssFragmentShader' /tmp/flycast/core/rend/vulkan/shaders.h
+          git -C /tmp/flycast diff --check
           test -f /tmp/flycast/core/rend/vulkan/whats_next/shaders/mini_dlss_upscale.comp
       - name: Compile WHAT'S NEXT renderer bridge sources
         run: |
@@ -45,6 +50,20 @@ jobs:
               -I /tmp/flycast/core/rend/vulkan/whats_next/include \
               -fsyntax-only "/tmp/flycast/core/rend/vulkan/whats_next/src/${source}.cpp"
           done
+      - name: Compile Mini-DLSS ordinary-frame fragment shader
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          source = Path('/tmp/flycast/core/rend/vulkan/shaders.cpp').read_text()
+          marker = 'static const char QuadFragmentShaderSource[] = R"('
+          start = source.index(marker) + len(marker)
+          end = source.index(')";', start)
+          body = source[start:end]
+          Path('/tmp/mini_dlss_quad.frag').write_text(
+              '#version 450\\n#define IGNORE_TEX_ALPHA 1\\n#define MINI_DLSS 1\\n' + body
+          )
+          PY
+          glslangValidator -V -S frag /tmp/mini_dlss_quad.frag -o /tmp/mini_dlss_quad.spv
       - name: Compile modified interpolation fragment shader
         run: |
           sudo apt-get update
