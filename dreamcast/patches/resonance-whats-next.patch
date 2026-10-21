@@ -388,7 +388,7 @@ index 0000000..1111111
 diff --git a/core/rend/vulkan/CMakeLists.txt b/core/rend/vulkan/CMakeLists.txt
 --- a/core/rend/vulkan/CMakeLists.txt
 +++ b/core/rend/vulkan/CMakeLists.txt
-@@ -46,6 +46,13 @@ else()
+@@ -46,6 +46,12 @@ else()
      target_sources(${PROJECT_NAME} PRIVATE
              vulkan_driver.h
              vulkan_context.cpp
@@ -404,13 +404,13 @@ diff --git a/core/rend/vulkan/CMakeLists.txt b/core/rend/vulkan/CMakeLists.txt
 diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_context.cpp
 --- a/core/rend/vulkan/vulkan_context.cpp
 +++ b/core/rend/vulkan/vulkan_context.cpp
-@@ -20,6 +20,7 @@
+@@ -20,4 +20,5 @@
  #include "vulkan_context.h"
  #include "frame_gen.h"
 +#include "whats_next/frame_generation_bridge.hpp"
  #ifdef __ORBIS__
  #include <atomic>
-@@ -1220,6 +1221,7 @@ void VulkanContext::PresentFrame(vk::Image image, vk::ImageView imageView, const
+@@ -1220,22 +1221,39 @@ void VulkanContext::PresentFrame(vk::Image image, vk::ImageView imageView, const
  	bool interpolate = false;
  	vk::ImageView prevView;
  #ifdef __ORBIS__
@@ -454,7 +454,7 @@ diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_conte
 +	}
 +	fgWasGuiOpen = gui_is_open();
  #endif
-@@ -1280,6 +1301,8 @@ void VulkanContext::PresentFrame(vk::Image image, vk::ImageView imageView, const
+@@ -1280,4 +1301,6 @@ void VulkanContext::PresentFrame(vk::Image image, vk::ImageView imageView, const
  			fgRealPending = fgDraw;
  			fgDraw = false;
 +			if (sourceAccepted)
@@ -464,7 +464,7 @@ diff --git a/core/rend/vulkan/vulkan_context.cpp b/core/rend/vulkan/vulkan_conte
 diff --git a/core/rend/vulkan/vulkan_context.h b/core/rend/vulkan/vulkan_context.h
 --- a/core/rend/vulkan/vulkan_context.h
 +++ b/core/rend/vulkan/vulkan_context.h
-@@ -286,6 +286,10 @@ private:
+@@ -286,3 +286,7 @@ private:
  	bool fgDraw = false;
  	bool fgRealPending = false;
 +	whats_next::FrameGenerationBridge whatsNextBridge;
