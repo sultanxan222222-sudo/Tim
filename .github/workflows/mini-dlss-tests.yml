@@ -36,3 +36,16 @@ jobs:
           ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: ctest --test-dir build/mini-dlss-sanitize --output-on-failure
+
+  shader-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install GLSL compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools
+      - name: Compile compute shaders to SPIR-V
+        run: |
+          glslangValidator -V -S comp dreamcast/mini-dlss/shaders/edge_aware_sharpen.comp -o /tmp/edge_aware_sharpen.spv
+          glslangValidator -V -S comp dreamcast/mini-dlss/shaders/mini_dlss_upscale.comp -o /tmp/mini_dlss_upscale.spv
