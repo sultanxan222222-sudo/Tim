@@ -6,6 +6,7 @@ an exact-match check so upstream drift fails loudly instead of half-applying.
 """
 from __future__ import annotations
 
+import re
 import shutil
 import sys
 from pathlib import Path
@@ -70,23 +71,25 @@ def main() -> None:
         '#ifdef __ORBIS__\n\tbool sourceAccepted = false;\n\t// a new frame from the renderer'
     )
 
-    old_gate = '''\\t\\tinterpolate = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
-\t\t\t\t&& !settings.input.fastForwardMode && fgStreak >= 3 && fgPrevView && fgPrevView != imageView
-\t\t\t\t&& fgPrevExtent == extent;'''
-    new_gate = '''\t\tconst bool eligible = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
-\t\t\t\t&& !settings.input.fastForwardMode && fgStreak >= 3 && fgPrevView && fgPrevView != imageView
-\t\t\t\t&& fgPrevExtent == extent;
-\t\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
-\t\t{
-\t\t\t++fgResourceGeneration;
-\t\t\twhatsNextBridge.reset();
-\t\t}
-\t\tconst auto decision = whatsNextBridge.begin_real_frame(
-\t\t\t\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
-\t\t\t\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
-\t\t\t\t\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
-\t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;'''
-    replace_once(context_cpp, old_gate, new_gate)
+    gate_pattern = r"(?m)^[ \\t]*interpolate = config::FrameGeneration.*?fgPrevExtent == extent;"
+    new_gate = """\\t\\tconst bool eligible = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
+\\t\\t\\t\\t&& !settings.input.fastForwardMode && fgStreak >= 3 && fgPrevView && fgPrevView != imageView
+\\t\\t\\t\\t&& fgPrevExtent == extent;
+\\t\\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
+\\t\\t{
+\\t\\t\\t++fgResourceGeneration;
+\\t\\t\\twhatsNextBridge.reset();
+\\t\\t}
+\\t\\tconst auto decision = whatsNextBridge.begin_real_frame(
+\\t\\t\\t\\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
+\\t\\t\\t\\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
+\\t\\t\\t\\t\\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
+\\t\\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;"""
+    gate_matches = re.findall(gate_pattern, context_cpp.read_text(encoding="utf-8"), flags=re.S)
+    if len(gate_matches) != 1:
+        raise SystemExit(f"Expected one interpolation gate in {context_cpp}, found {len(gate_matches)}")
+    data = context_cpp.read_text(encoding="utf-8")
+    context_cpp.write_text(re.sub(gate_pattern, new_gate, data, count=1, flags=re.S), encoding="utf-8")
 
     replace_once(
         context_cpp,
