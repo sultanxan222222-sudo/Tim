@@ -27,5 +27,20 @@ int main() {
     invalid.width = 0;
     assert(policy.decide(true, invalid, HistoryDecision::Accept, {2}) ==
            FrameGenerationDecision::PresentRealHistoryRejected);
+
+    auto unknown_format = frame;
+    unknown_format.format = PixelFormat::Unknown;
+    assert(policy.decide(true, unknown_format, HistoryDecision::Accept, {2}) ==
+           FrameGenerationDecision::PresentRealHistoryRejected);
+
+    auto missing_session = frame;
+    missing_session.game_session = 0;
+    assert(policy.decide(true, missing_session, HistoryDecision::Accept, {2}) ==
+           FrameGenerationDecision::PresentRealHistoryRejected);
+
+    auto missing_resources = frame;
+    missing_resources.resource_generation = 0;
+    assert(policy.decide(true, missing_resources, HistoryDecision::Accept, {2}) ==
+           FrameGenerationDecision::PresentRealHistoryRejected);
     return 0;
 }
