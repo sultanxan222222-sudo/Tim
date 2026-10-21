@@ -9,7 +9,9 @@ set -Eeuo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RESONANCE_DIR="${RESONANCE_DIR:-$HOME/resonance}"
 PS4_BUILD_ROOT="${PS4_BUILD_ROOT:-$HOME/resonance-build}"
-FLYCAST_SRC="$PS4_BUILD_ROOT/src/flycast"
+FLYCAST_SRC="$PS4_BUILD_ROOT/src/flycast-whats-next"
+CRM="${CRM:-$HOME/cemups4-build}"
+OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
 LOG_DIR="$PS4_BUILD_ROOT/logs"
 OUT_DIR="$PS4_BUILD_ROOT/out"
 VERSION="${RESONANCE_VERSION:-01.00}"
@@ -32,8 +34,19 @@ done
 [[ -f "$ROOT/scripts/apply-resonance-whats-next.sh" ]] || fail "WHAT'S NEXT overlay script is missing."
 [[ -x "$ROOT/scripts/test-whats-next.sh" || -f "$ROOT/scripts/test-whats-next.sh" ]] || fail "WHAT'S NEXT host test script is missing."
 
+# Fail early if the machine-specific PS4 toolchain/sysroot used by Resonance is absent.
+# Host-only CMake success is not enough to produce an installable PS4 package.
+for path in "$CRM/sysroot" "$CRM/host-compat" "$CRM/build/mesa"; do
+    [[ -d "$path" ]] || fail "Missing PS4 build prerequisite: $path. Prepare the Crema/DolphinPS4 build tree first."
+done
+for path in "$OPENORBIS/ps4vars.sh" "$OPENORBIS/bin/linux/PkgTool.Core" "$OPENORBIS/bin/linux/create-gp4" "$OPENORBIS/samples/piglet/sce_module"; do
+    [[ -e "$path" ]] || fail "Missing OpenOrbis toolchain component: $path."
+done
+[[ -f "$RESONANCE_DIR/sce_sys/icon0.png" && -f "$RESONANCE_DIR/sce_sys/pic1.png" ]] || fail "Resonance package icons are missing."
+[[ -d "$RESONANCE_DIR/launcher-assets/launcher" ]] || fail "Resonance launcher assets are missing."
+
 mkdir -p "$PS4_BUILD_ROOT" "$LOG_DIR" "$OUT_DIR"
-export PS4_BUILD_ROOT
+export PS4_BUILD_ROOT PSB="$PS4_BUILD_ROOT" CRM OPENORBIS FLYCAST_SRC
 export RESONANCE_VERSION="$VERSION"
 
 step "1/7 — Host contract tests"
@@ -48,13 +61,20 @@ fi
 if [[ -L "$HOME/resonance" && "$(readlink -f "$HOME/resonance")" != "$(readlink -f "$RESONANCE_DIR")" ]]; then
     fail "$HOME/resonance points to a different checkout. Set up the expected symlink manually; this script will not replace it."
 fi
+BASE="$(awk '$1 == "base:" {print $2; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
+[[ -n "$BASE" ]] || fail "Could not read the pinned Flycast revision from patches/BASE.txt."
 if [[ ! -d "$FLYCAST_SRC/.git" ]]; then
     [[ ! -e "$FLYCAST_SRC" ]] || fail "$FLYCAST_SRC exists but is not a Git checkout; move it aside before cloning."
     git clone --recursive https://github.com/flyinghead/flycast.git "$FLYCAST_SRC" 2>&1 | tee "$LOG_DIR/clone-flycast.log"
+else
+    REMOTE="$(git -C "$FLYCAST_SRC" remote get-url origin 2>/dev/null || true)"
+    [[ "$REMOTE" == "https://github.com/flyinghead/flycast.git" || "$REMOTE" == "git@github.com:flyinghead/flycast.git" ]] || fail "Dedicated Flycast build folder has an unexpected origin: $REMOTE"
+    # This folder is reserved for repeatable builds. Reset only this dedicated checkout so
+    # a previous run's patch/overlay cannot break the next run's pinned-base check.
+    git -C "$FLYCAST_SRC" fetch --quiet origin "$BASE"
+    git -C "$FLYCAST_SRC" reset --hard "$BASE"
+    git -C "$FLYCAST_SRC" clean -ffd
 fi
-
-BASE="$(awk '$1 == "base:" {print $2; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
-[[ -n "$BASE" ]] || fail "Could not read the pinned Flycast revision from patches/BASE.txt."
 git -C "$FLYCAST_SRC" fetch --quiet origin "$BASE"
 git -C "$FLYCAST_SRC" checkout --detach "$BASE"
 git -C "$FLYCAST_SRC" submodule update --init --recursive
@@ -99,9 +119,9 @@ bash "$RESONANCE_DIR/scripts/rebuild-flycast.sh" 2>&1 | tee "$LOG_DIR/rebuild-fl
 bash "$RESONANCE_DIR/scripts/package-resonance.sh" 2>&1 | tee "$LOG_DIR/package-resonance.log"
 
 step "7/7 — Verify output"
-mapfile -t PKGS < <(find "$RESONANCE_DIR" "$PS4_BUILD_ROOT" -type f -name '*.pkg' -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -5 | cut -d' ' -f2-)
-(("${#PKGS[@]}" > 0)) || fail "Build scripts finished but no .pkg was found. Inspect logs in $LOG_DIR."
-printf 'Found package candidate(s):\n'
-printf '  %s\n' "${PKGS[@]}"
-printf '\nBuild logs: %s\n' "$LOG_DIR"
-printf 'Note: this script can compile/package only when the local PS4 SDK/sysroot prerequisites are already installed. A successful host test alone is not a PS4 build.\n'
+PKG="$RESONANCE_DIR/out/Resonance-v$VERSION.pkg"
+[[ -s "$PKG" ]] || fail "Expected package was not produced: $PKG. Inspect logs in $LOG_DIR."
+printf 'Verified package file: %s\n' "$PKG"
+ls -lh "$PKG"
+printf 'Build logs: %s\n' "$LOG_DIR"
+printf 'The PKG was created by the PS4 toolchain. Console installation and visual/performance testing still require a PS4.\n'
