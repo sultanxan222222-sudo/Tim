@@ -38,5 +38,13 @@ int main() {
 
     gate.reset();
     assert(gate.evaluate(b) == HistoryDecision::RejectNoPrevious);
+
+    // Frame IDs must never wrap and accidentally reuse stale history.
+    auto last_id = a;
+    last_id.frame_id = UINT64_MAX;
+    gate.commit(last_id);
+    auto wrapped = last_id;
+    wrapped.frame_id = 1;
+    assert(gate.evaluate(wrapped) == HistoryDecision::RejectDiscontinuity);
     return 0;
 }
