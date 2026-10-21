@@ -15,11 +15,13 @@ OPENORBIS="${OPENORBIS:-/opt/pacbrew/ps4/openorbis}"
 LOG_DIR="$PS4_BUILD_ROOT/logs"
 OUT_DIR="$PS4_BUILD_ROOT/out"
 VERSION="${RESONANCE_VERSION:-01.00}"
+EXPECTED_BUILD_ROOT="$HOME/resonance-build"
 
 fail() { printf '\nBUILD STOPPED: %s\n' "$*" >&2; exit 1; }
 step() { printf '\n========== %s ==========\n' "$*"; }
 
 [[ "$VERSION" =~ ^[0-9]{2}\.[0-9]{2}$ ]] || fail "RESONANCE_VERSION must use XX.YY format (for example 01.00)."
+[[ "$(readlink -m "$PS4_BUILD_ROOT")" == "$(readlink -m "$EXPECTED_BUILD_ROOT")" ]] || fail "Resonance log/build helpers are pinned to $EXPECTED_BUILD_ROOT; set PS4_BUILD_ROOT to that path."
 for cmd in git python3 cmake ninja; do
     command -v "$cmd" >/dev/null 2>&1 || fail "Required command is missing: $cmd"
 done
@@ -115,7 +117,15 @@ step "5/7 — Build network filesystem dependencies"
 bash "$RESONANCE_DIR/scripts/build-netfs.sh" 2>&1 | tee "$LOG_DIR/build-netfs.log"
 
 step "6/7 — Compile and package PS4 application"
-bash "$RESONANCE_DIR/scripts/rebuild-flycast.sh" 2>&1 | tee "$LOG_DIR/rebuild-flycast.log"
+# Force a clean native build and inspect logrun's recorded exit status. The upstream
+# wrapper prints error summaries but does not propagate ninja's exit code reliably.
+bash "$RESONANCE_DIR/scripts/rebuild-flycast.sh" clean 2>&1 | tee "$LOG_DIR/rebuild-flycast.log"
+BUILD_LOG="$EXPECTED_BUILD_ROOT/logs/build.log"
+[[ -f "$BUILD_LOG" ]] || fail "Build log was not created: $BUILD_LOG"
+grep -qx 'exit=0' "$BUILD_LOG" || fail "Native Flycast/PS4 compilation failed; last build log lines: $(tail -8 "$BUILD_LOG" | tr '\n' ' ')"
+EBOOT="$PS4_BUILD_ROOT/build/flycast/shell/ps4/flycast_eboot/eboot.bin"
+[[ -s "$EBOOT" ]] || fail "Native build did not produce a non-empty eboot.bin: $EBOOT"
+rm -f "$RESONANCE_DIR/out/Resonance-v$VERSION.pkg"
 bash "$RESONANCE_DIR/scripts/package-resonance.sh" 2>&1 | tee "$LOG_DIR/package-resonance.log"
 
 step "7/7 — Verify output"
