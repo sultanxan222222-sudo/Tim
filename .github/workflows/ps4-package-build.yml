@@ -87,6 +87,10 @@ jobs:
         run: |
           git clone https://github.com/iHaiDeeZ/DolphinPS4.git "$DOLPHIN_PS4_SOURCE"
           git -C "$DOLPHIN_PS4_SOURCE" checkout b5221e6dd36391042a232957eeb61f210b7cd51f
+          # GitHub's checkout has these helper scripts non-executable; the upstream
+          # build-libcxx.sh invokes prepare-sysroot.sh and ps4-cc directly.
+          find "$DOLPHIN_PS4_SOURCE/toolchain" -type f -name '*.sh' -exec chmod +x {} +
+          chmod +x "$DOLPHIN_PS4_SOURCE/toolchain/bin/ps4-cc" "$DOLPHIN_PS4_SOURCE/toolchain/bin/ps4-c++"
           mkdir -p "$CRM/src" "$CRM/host-compat" "$CRM/logs"
 
       - name: Build PS4 libc++ and runtime
