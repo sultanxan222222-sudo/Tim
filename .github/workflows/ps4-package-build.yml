@@ -41,14 +41,14 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-          /home/runner/dolphinps4-build/sysroot
-          /home/runner/dolphinps4-build/build/libcxx
-          /home/runner/dolphinps4-build/build/runtime
-          /home/runner/dolphinps4-build/build/mesa
-          /home/runner/dolphinps4-build/src/llvm-project-21.1.6.src
-          /home/runner/dolphinps4-build/src/mesa
-          /home/runner/dolphinps4-build/src/libdrm
-          /home/runner/dolphinps4-build/mesa-venv
+            /home/runner/dolphinps4-build/sysroot
+            /home/runner/dolphinps4-build/build/libcxx
+            /home/runner/dolphinps4-build/build/runtime
+            /home/runner/dolphinps4-build/build/mesa
+            /home/runner/dolphinps4-build/src/llvm-project-21.1.6.src
+            /home/runner/dolphinps4-build/src/mesa
+            /home/runner/dolphinps4-build/src/libdrm
+            /home/runner/dolphinps4-build/mesa-venv
           key: ps4-toolchain-v1-${{ github.run_id }}
           restore-keys: |
             ps4-toolchain-v1-
@@ -215,12 +215,12 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: |
-          /home/runner/dolphinps4-build/sysroot
-          /home/runner/dolphinps4-build/build/libcxx
-          /home/runner/dolphinps4-build/build/runtime
-          /home/runner/dolphinps4-build/build/mesa
-          /home/runner/dolphinps4-build/src/llvm-project-21.1.6.src
-          /home/runner/dolphinps4-build/src/mesa
-          /home/runner/dolphinps4-build/src/libdrm
-          /home/runner/dolphinps4-build/mesa-venv
+            /home/runner/dolphinps4-build/sysroot
+            /home/runner/dolphinps4-build/build/libcxx
+            /home/runner/dolphinps4-build/build/runtime
+            /home/runner/dolphinps4-build/build/mesa
+            /home/runner/dolphinps4-build/src/llvm-project-21.1.6.src
+            /home/runner/dolphinps4-build/src/mesa
+            /home/runner/dolphinps4-build/src/libdrm
+            /home/runner/dolphinps4-build/mesa-venv
           key: ps4-toolchain-v1-${{ github.run_id }}
