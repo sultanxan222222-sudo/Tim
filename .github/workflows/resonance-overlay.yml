@@ -52,6 +52,8 @@ jobs:
           done
       - name: Compile Mini-DLSS ordinary-frame fragment shader
         run: |
+          sudo apt-get update
+          sudo apt-get install -y glslang-tools
           python3 - <<'PY'
           from pathlib import Path
           source = Path('/tmp/flycast/core/rend/vulkan/shaders.cpp').read_text()
@@ -60,14 +62,12 @@ jobs:
           end = source.index(')";', start)
           body = source[start:end]
           Path('/tmp/mini_dlss_quad.frag').write_text(
-              '#version 450\\n#define IGNORE_TEX_ALPHA 1\\n#define MINI_DLSS 1\\n' + body
+              '#version 450\n#define IGNORE_TEX_ALPHA 1\n#define MINI_DLSS 1\n' + body
           )
           PY
           glslangValidator -V -S frag /tmp/mini_dlss_quad.frag -o /tmp/mini_dlss_quad.spv
       - name: Compile modified interpolation fragment shader
         run: |
-          sudo apt-get update
-          sudo apt-get install -y glslang-tools
           python3 - <<'PY'
           from pathlib import Path
           source = Path('/tmp/flycast/core/rend/vulkan/frame_gen.cpp').read_text()
