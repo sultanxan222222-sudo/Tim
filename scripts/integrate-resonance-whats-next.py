@@ -130,7 +130,8 @@ def main() -> None:
 \t\t\t\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
 \t\t\t\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
 \t\t\t\t\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
-\t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;'''
+\t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
+\t\tsourceAccepted = true; // this source frame reached the normal presentation decision point'''
     replace_once(context_cpp, 'fgPrevExtent == extent;', 'fgPrevExtent == extent;\n' + '\n'.join(bridge_gate.splitlines()[1:]))
 
     replace_once(
