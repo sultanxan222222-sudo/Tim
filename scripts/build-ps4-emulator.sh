@@ -75,7 +75,7 @@ else
 fi
 # BASE.txt records a short hash. Fetch branch history first, then resolve it locally to
 # a full object ID; git-upload-pack is not required to accept an abbreviated SHA as a want.
-BASE_FULL="$(git -C "$FLYCAST_SRC" rev-parse --verify "\${BASE}^{commit}" 2>/dev/null || true)"
+BASE_FULL="$(git -C "$FLYCAST_SRC" rev-parse --verify "${BASE}^{commit}" 2>/dev/null || true)"
 [[ "$BASE_FULL" =~ ^[0-9a-f]{40}$ ]] || fail "Pinned Flycast revision $BASE is not present in the fetched upstream history."
 git -C "$FLYCAST_SRC" reset --hard "$BASE_FULL"
 git -C "$FLYCAST_SRC" clean -ffd
