@@ -38,3 +38,17 @@ add_test(NAME motion_estimator_test COMMAND motion_estimator_test)
 add_test(NAME frame_generation_policy_test COMMAND frame_generation_policy_test)
 add_test(NAME frame_generation_controller_test COMMAND frame_generation_controller_test)
 add_test(NAME frame_generation_bridge_test COMMAND frame_generation_bridge_test)
+
+option(WHATS_NEXT_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer on supported host compilers" OFF)
+if(WHATS_NEXT_ENABLE_SANITIZERS AND NOT MSVC)
+    foreach(target
+        whats_next_history
+        history_gate_test
+        motion_estimator_test
+        frame_generation_policy_test
+        frame_generation_controller_test
+        frame_generation_bridge_test)
+        target_compile_options(${target} PRIVATE -fsanitize=address,undefined -fno-omit-frame-pointer)
+        target_link_options(${target} PRIVATE -fsanitize=address,undefined)
+    endforeach()
+endif()
