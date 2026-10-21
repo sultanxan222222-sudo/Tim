@@ -46,7 +46,7 @@ Reviewed upstream Flycast's `core/rend/vulkan/vulkan_renderer.cpp` and `vulkan_r
 
 1. Audit Resonance's existing frame-generation implementation first; avoid duplicating its UI, timing detector, and interpolation passes.
 2. Place WHAT'S NEXT's `FrameContract`, `HistoryGate`, and new `FrameGenerationPolicy` around that existing path as a conservative control layer: reject stale history after resize, resource recreation, game switch, dropped frames, or unsupported cadence.
-3. Compare M33's block-motion + half-warp + error-gated cross-fade against Resonance's Per Triangle / Per Strip / Per Pixel methods. M33 is a reference option, not automatically the better algorithm.
+3. Locate the code behind Resonance's Frame Generation setting in the exact pinned Flycast source/PS4 patch, then compare that implementation with M33's block-motion + half-warp + error-gated cross-fade. Flycast alpha-sorting modes are a separate feature and must not be confused with frame interpolation.
 4. Prefer the existing GPU-resident frame/image path. Do not insert a CPU full-frame readback pass into the normal game-present loop.
 5. Keep the original presentation path as the fail-safe; frame generation remains optional until frame-time and input-latency tests on PS4 Pro.
 
@@ -54,4 +54,4 @@ Reviewed upstream Flycast's `core/rend/vulkan/vulkan_renderer.cpp` and `vulkan_r
 
 - Added a backend-neutral `FrameGenerationPolicy` API and host test source in Tim. It selects a generated intermediate only when the option is enabled, history is accepted, and the observed cadence is exactly two display refresh intervals; otherwise it directs the caller to present the real frame.
 - Added the new source and test target to the CMake project.
-- This is scheduling/control logic only. It is not yet wired into Resonance/Flycast's C++ renderer, and the new test target has not yet been compiled or run. No PS4 build or PKG has been produced.
+- This is scheduling/control logic only. It is not yet wired into Resonance/Flycast's C++ renderer. The new GitHub Actions host workflow has successfully configured, built, and run all CTest targets (including history, motion-estimator, and frame-generation-policy tests). This is a host build, not a PS4 toolchain build. No PS4 build or PKG has been produced.
