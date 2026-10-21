@@ -35,6 +35,16 @@ int main() {
     assert(field.vectors[0].valid);
     assert(field.vectors[0].dx == 2);
     assert(field.vectors[0].dy == 0);
+    assert(field.vectors[0].confidence >= 0.0f && field.vectors[0].confidence <= 1.0f);
+
+    // The CPU reference must be deterministic for identical input/configuration.
+    auto repeated = estimate_block_motion({previous.data(), w, h, w},
+                                          {current.data(), w, h, w}, cfg);
+    assert(repeated.valid);
+    assert(repeated.vectors.size() == field.vectors.size());
+    assert(repeated.vectors[0].dx == field.vectors[0].dx);
+    assert(repeated.vectors[0].dy == field.vectors[0].dy);
+    assert(repeated.vectors[0].confidence == field.vectors[0].confidence);
 
     // Flat regions are deliberately invalid: no trustworthy motion signal.
     std::vector<std::uint8_t> flat(w * h, 128);
