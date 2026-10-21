@@ -135,10 +135,38 @@ cp -a "$OVERLAY_SRC/." "$OVERLAY_DST/"
 grep -q 'sin6_len' "$OVERLAY_DST/netinet/in.h" || fail "PS4 socket ABI overlay did not install sockaddr_in6.sin6_len."
 grep -q 'struct sockaddr_in6' "$OVERLAY_DST/netinet/in.h" || fail "PS4 IPv6 socket declaration is missing."
 
-step "5/7 — Build network filesystem dependencies"
+step "5/8 — Build static zlib, OpenSSL and libcurl dependencies"
+# Resonance's PS4 frontend links HTTPS/update/download support against static curl+OpenSSL.
+# Reuse the public, known PS4 recipes from Crema instead of host libraries or OpenOrbis DLLs.
+CREMA_DEPS_DIR="$PS4_BUILD_ROOT/src/crema-builddeps"
+CREMA_DEPS_REV="475b8d5bd3498dbd5cfefe8175f98d017a017739"
+if [[ ! -d "$CREMA_DEPS_DIR/.git" ]]; then
+    [[ ! -e "$CREMA_DEPS_DIR" ]] || fail "$CREMA_DEPS_DIR exists but is not a Git checkout."
+    mkdir -p "$CREMA_DEPS_DIR"
+    git -C "$CREMA_DEPS_DIR" init
+    git -C "$CREMA_DEPS_DIR" remote add origin https://github.com/iHaiDeeZ/Crema.git
+fi
+CREMA_REMOTE="$(git -C "$CREMA_DEPS_DIR" remote get-url origin 2>/dev/null || true)"
+[[ "$CREMA_REMOTE" == "https://github.com/iHaiDeeZ/Crema.git" || "$CREMA_REMOTE" == "git@github.com:iHaiDeeZ/Crema.git" ]] || fail "PS4 dependency recipe checkout has an unexpected origin: $CREMA_REMOTE"
+git -C "$CREMA_DEPS_DIR" fetch --depth 1 origin "$CREMA_DEPS_REV" 2>&1 | tee "$LOG_DIR/fetch-crema-deps.log"
+git -C "$CREMA_DEPS_DIR" reset --hard FETCH_HEAD
+git -C "$CREMA_DEPS_DIR" clean -ffd
+for f in "$CREMA_DEPS_DIR/scripts/build-deps.sh" "$CREMA_DEPS_DIR/toolchain/env.sh" "$CREMA_DEPS_DIR/toolchain/ps4-deps.cmake" "$CREMA_DEPS_DIR/toolchain/bin/ps4-cc"; do
+    [[ -f "$f" ]] || fail "Crema PS4 dependency recipe file is missing: $f"
+done
+find "$CREMA_DEPS_DIR/toolchain" -type f -name '*.sh' -exec chmod +x {} +
+chmod +x "$CREMA_DEPS_DIR/toolchain/bin/ps4-cc" "$CREMA_DEPS_DIR/toolchain/bin/ps4-c++"
+PSB="$PS4_BUILD_ROOT" PS4_SYSROOT="$PS4_BUILD_ROOT/sysroot" OPENORBIS="$OPENORBIS" JOBS="$JOBS" \
+    bash "$CREMA_DEPS_DIR/scripts/build-deps.sh" zlib openssl curl 2>&1 | tee "$LOG_DIR/build-https-deps.log"
+for lib in libz.a libssl.a libcrypto.a libcurl.a; do
+    [[ -s "$PS4_BUILD_ROOT/sysroot/lib/$lib" ]] || fail "Required static PS4 library wasn't built: $PS4_BUILD_ROOT/sysroot/lib/$lib"
+done
+[[ -f "$PS4_BUILD_ROOT/sysroot/include/curl/curl.h" ]] || fail "PS4 libcurl headers were not installed."
+
+step "6/8 — Build network filesystem dependencies"
 bash "$RESONANCE_DIR/scripts/build-netfs.sh" 2>&1 | tee "$LOG_DIR/build-netfs.log"
 
-step "6/7 — Compile and package PS4 application"
+step "7/8 — Compile and package PS4 application"
 # Force a clean native build and inspect logrun's recorded exit status. The upstream
 # wrapper prints error summaries but does not propagate ninja's exit code reliably.
 bash "$RESONANCE_DIR/scripts/rebuild-flycast.sh" clean 2>&1 | tee "$LOG_DIR/rebuild-flycast.log"
@@ -150,7 +178,7 @@ EBOOT="$PS4_BUILD_ROOT/build/flycast/shell/ps4/flycast_eboot/eboot.bin"
 rm -f "$RESONANCE_DIR/out/Resonance-v$VERSION.pkg"
 bash "$RESONANCE_DIR/scripts/package-resonance.sh" 2>&1 | tee "$LOG_DIR/package-resonance.log"
 
-step "7/7 — Verify output"
+step "8/8 — Verify output"
 PKG="$RESONANCE_DIR/out/Resonance-v$VERSION.pkg"
 [[ -s "$PKG" ]] || fail "Expected package was not produced: $PKG. Inspect logs in $LOG_DIR."
 printf 'Verified package file: %s\n' "$PKG"
