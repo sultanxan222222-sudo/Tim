@@ -51,6 +51,20 @@ int main() {
     assert(decision == FrameGenerationDecision::PresentRealHistoryRejected);
     bridge.commit_real_frame();
 
+    // Reset between begin and commit must invalidate the pending source frame.
+    // A late commit from the old renderer generation must not seed history or
+    // advance the new generation's frame counter.
+    bridge.reset();
+    decision = bridge.begin_real_frame(
+        true, 640, 480, PixelFormat::RGBA8, 10, 10, {2});
+    assert(decision == FrameGenerationDecision::PresentRealFirstFrame);
+    bridge.reset();
+    bridge.commit_real_frame();
+    assert(bridge.current_frame_id() == 1);
+    decision = bridge.begin_real_frame(
+        true, 640, 480, PixelFormat::RGBA8, 10, 10, {2});
+    assert(decision == FrameGenerationDecision::PresentRealFirstFrame);
+
     // Cadence mismatch and disabled mode must never claim a generated frame.
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 1, 1, {1});
