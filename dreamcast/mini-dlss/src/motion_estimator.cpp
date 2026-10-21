@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <cmath>
 
 namespace whats_next {
 namespace {
@@ -59,6 +60,8 @@ MotionField estimate_block_motion(GrayImageView previous,
         config.block_size < 4 || config.search_radius > 32 ||
         config.sample_step == 0 || config.sample_step > config.block_size ||
         config.block_size > previous.width || config.block_size > previous.height ||
+        !std::isfinite(config.max_mean_absolute_error) ||
+        !std::isfinite(config.minimum_texture_variance) ||
         config.max_mean_absolute_error < 0.0f ||
         config.minimum_texture_variance < 0.0f) {
         return field;
