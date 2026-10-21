@@ -34,3 +34,4 @@ jobs:
           test -f /tmp/flycast/core/rend/vulkan/whats_next/src/frame_generation_bridge.cpp
           grep -q 'whats_next/src/frame_generation_bridge.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
           grep -q 'whatsNextBridge.begin_real_frame' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
+          test -f /tmp/flycast/core/rend/vulkan/whats_next/shaders/mini_dlss_upscale.comp
