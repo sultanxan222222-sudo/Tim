@@ -71,7 +71,7 @@ def main() -> None:
         '#ifdef __ORBIS__\n\tbool sourceAccepted = false;\n\t// a new frame from the renderer'
     )
 
-    bridge_gate = '''\t\t\t\t&& fgPrevExtent == extent;
+    bridge_gate = '''&& fgPrevExtent == extent;
 \t\tconst bool eligible = interpolate;
 \t\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
 \t\t{
