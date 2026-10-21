@@ -112,6 +112,21 @@ int main() {
         {nullptr, w, h, w}, {current.data(), w, h, w}, cfg);
     assert(!null_input.valid);
 
+    // Reject dimensions that would overflow signed search coordinates before
+    // any pixel memory is touched.
+    auto oversized_dimensions = estimate_block_motion(
+        {previous.data(), std::numeric_limits<std::uint32_t>::max(), h,
+         std::numeric_limits<std::uint32_t>::max()},
+        {current.data(), std::numeric_limits<std::uint32_t>::max(), h,
+         std::numeric_limits<std::uint32_t>::max()}, cfg);
+    assert(!oversized_dimensions.valid);
+
+    // Reject a row-stride layout whose last pixel index cannot fit in size_t.
+    auto overflowing_stride = estimate_block_motion(
+        {previous.data(), w, 2, std::numeric_limits<std::size_t>::max()},
+        {current.data(), w, 2, std::numeric_limits<std::size_t>::max()}, cfg);
+    assert(!overflowing_stride.valid);
+
     // Guardrails for pathological search settings and unsupported block sizes.
     cfg.minimum_texture_variance = 12.0f;
     cfg.max_mean_absolute_error = 18.0f;
