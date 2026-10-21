@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(whats_next_history src/history_gate.cpp src/motion_estimator.cpp)
+add_library(whats_next_history src/history_gate.cpp src/motion_estimator.cpp src/frame_generation_policy.cpp)
 target_include_directories(whats_next_history PUBLIC include)
 
 add_executable(history_gate_test tests/history_gate_test.cpp)
@@ -14,6 +14,10 @@ target_link_libraries(history_gate_test PRIVATE whats_next_history)
 add_executable(motion_estimator_test tests/motion_estimator_test.cpp)
 target_link_libraries(motion_estimator_test PRIVATE whats_next_history)
 
+add_executable(frame_generation_policy_test tests/frame_generation_policy_test.cpp)
+target_link_libraries(frame_generation_policy_test PRIVATE whats_next_history)
+
 enable_testing()
 add_test(NAME history_gate_test COMMAND history_gate_test)
 add_test(NAME motion_estimator_test COMMAND motion_estimator_test)
+add_test(NAME frame_generation_policy_test COMMAND frame_generation_policy_test)
