@@ -35,6 +35,8 @@ jobs:
           grep -q 'whats_next/src/frame_generation_bridge.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
           grep -q 'whatsNextBridge.begin_real_frame' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'Mini-DLSS spatial finishing pass' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
+          grep -q 'vec3 lo = min(base' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
+          grep -q 'vec3 hi = max(base' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
           test -f /tmp/flycast/core/rend/vulkan/whats_next/shaders/mini_dlss_upscale.comp
       - name: Compile modified interpolation fragment shader
         run: |
