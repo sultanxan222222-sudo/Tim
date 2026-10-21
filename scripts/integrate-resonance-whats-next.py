@@ -64,7 +64,13 @@ def main() -> None:
         '#include "vulkan.h"\n#include "whats_next/frame_generation_bridge.hpp"\n'
     )
 
-    replace_once(\n        context_cpp,\n        '#ifdef __ORBIS__\\n\\t// a new frame from the renderer',\n        '#ifdef __ORBIS__\\n\\tbool sourceAccepted = false;\\n\\t// a new frame from the renderer'\n    )\n\n    old_gate = '''\\t\\tinterpolate = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
+    replace_once(
+        context_cpp,
+        '#ifdef __ORBIS__\n\t// a new frame from the renderer',
+        '#ifdef __ORBIS__\n\tbool sourceAccepted = false;\n\t// a new frame from the renderer'
+    )
+
+    old_gate = '''\\t\\tinterpolate = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
 \t\t\t\t&& !settings.input.fastForwardMode && fgStreak >= 3 && fgPrevView && fgPrevView != imageView
 \t\t\t\t&& fgPrevExtent == extent;'''
     new_gate = '''\t\tconst bool eligible = config::FrameGeneration && swapOnVSync && !config::Rotate90 && !gui_is_open()
