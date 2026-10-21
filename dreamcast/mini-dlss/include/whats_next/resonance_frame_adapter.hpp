@@ -15,6 +15,7 @@ public:
         bool enabled,
         std::uint32_t width,
         std::uint32_t height,
+        PixelFormat format,
         std::uint64_t resource_generation,
         std::uint64_t game_session,
         std::uint32_t refresh_intervals) noexcept;
