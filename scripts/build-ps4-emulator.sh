@@ -189,9 +189,12 @@ step "6/8 — Build network filesystem dependencies"
 bash "$RESONANCE_DIR/scripts/build-netfs.sh" 2>&1 | tee "$LOG_DIR/build-netfs.log"
 
 step "7/8 — Compile and package PS4 application"
-# Force a clean native build and inspect logrun's recorded exit status. The upstream
-# wrapper prints error summaries but does not propagate ninja's exit code reliably.
-bash "$RESONANCE_DIR/scripts/rebuild-flycast.sh" clean 2>&1 | tee "$LOG_DIR/rebuild-flycast.log"
+# Resonance's wrapper can itself return 1 when grep finds zero compiler errors, even
+# though logrun records exit=0. Treat that wrapper status as diagnostic only: the
+# recorded native-build status and the actual eboot.bin decide whether packaging proceeds.
+if ! bash "$RESONANCE_DIR/scripts/rebuild-flycast.sh" clean 2>&1 | tee "$LOG_DIR/rebuild-flycast.log"; then
+    echo "Resonance rebuild wrapper returned non-zero; validating its recorded native build status."
+fi
 BUILD_LOG="$EXPECTED_BUILD_ROOT/logs/build.log"
 [[ -f "$BUILD_LOG" ]] || fail "Build log was not created: $BUILD_LOG"
 grep -qx 'exit=0' "$BUILD_LOG" || fail "Native Flycast/PS4 compilation failed; last build log lines: $(tail -8 "$BUILD_LOG" | tr '\n' ' ')"
