@@ -64,6 +64,7 @@ int main() {
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 10, 10, {2});
     assert(decision == FrameGenerationDecision::PresentRealFirstFrame);
+    bridge.commit_real_frame();
 
     // Cadence mismatch and disabled mode must never claim a generated frame.
     decision = bridge.begin_real_frame(
