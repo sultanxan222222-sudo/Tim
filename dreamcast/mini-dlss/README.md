@@ -37,3 +37,20 @@ ctest --test-dir build --output-on-failure
 - `game_session` must change on game/session restart.
 - History is eligible only for consecutive frames in this conservative first version.
 - Temporal interpolation must remain disabled until frame input, motion confidence, and presentation timing are validated on the target renderer.
+
+
+## M33-inspired frame-generation scheduling
+
+The host-side control layer now includes `whats_next/frame_generation_policy.hpp` and
+`src/frame_generation_policy.cpp`. It does not render pixels or allocate Vulkan resources. It makes
+the safe scheduling decision around a renderer's existing frame-generation path:
+
+- Disabled feature -> bypass and show the real frame.
+- Missing history -> show the real frame and seed history.
+- Invalid/discontinuous history or changed resources/session -> show the real frame, do not synthesize.
+- Cadence other than exactly two display refresh intervals -> show the real frame.
+- Only enabled + valid accepted history + a two-refresh interval -> permit an intermediate frame.
+
+The decision is covered by `tests/frame_generation_policy_test.cpp` and added to CMake/CTest.
+
+Important discovery: Resonance already has its own experimental frame-generation feature and exposes Per Triangle / Per Strip / Per Pixel modes. Before implementing a second interpolation renderer, WHAT'S NEXT should wrap/audit that existing implementation and compare it with M33's GPU block-motion method. This policy is a control layer, not a claim that M33's shader has been integrated.
