@@ -7,6 +7,7 @@ This directory contains the first small C++ component intended to become part of
 - A backend-neutral frame contract shared by processing stages.
 - A history compatibility gate that rejects invalid frames, stale/non-consecutive frames, resolution/format/resource changes, and game-session changes.
 - A host-side CMake test target.
+- An unintegrated Vulkan compute shader prototype for conservative spatial sharpening (not FSR/DLSS and not temporal reconstruction).
 
 ## Build and test on a desktop host
 
@@ -20,7 +21,7 @@ The test exercises the acceptance path and the invalidation paths. The code has 
 
 ## What is not implemented yet
 
-This is not yet connected to Resonance/Flycast's Vulkan render pass. No Vulkan handles, shaders, motion vectors, depth images, or GPU submissions are connected. The PS4 build toolchain and console runtime are not present in this host test, so this is not a PS4 build and produces no PKG.
+This is not yet connected to Resonance/Flycast's Vulkan render pass. The sharpening shader source exists, but no Vulkan descriptors, shader compilation, dispatch, motion vectors, depth images, or GPU submissions are connected. The PS4 build toolchain and console runtime are not present in this host test, so this is not a PS4 build and produces no PKG.
 
 ## Integration constraints
 
