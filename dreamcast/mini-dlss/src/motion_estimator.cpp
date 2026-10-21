@@ -52,7 +52,7 @@ double sad(const GrayImageView& a, const GrayImageView& b,
 
 MotionField estimate_block_motion(GrayImageView previous,
                                   GrayImageView current,
-                                  const MotionConfig& config) noexcept {
+                                  const MotionConfig& config) {
     MotionField field;
     if (!valid_image(previous) || !valid_image(current) ||
         previous.width != current.width || previous.height != current.height ||
