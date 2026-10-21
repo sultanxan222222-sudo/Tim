@@ -59,7 +59,7 @@ git -C "$FLYCAST_SRC" fetch --quiet origin "$BASE"
 git -C "$FLYCAST_SRC" checkout --detach "$BASE"
 git -C "$FLYCAST_SRC" submodule update --init --recursive
 for dep in libnfs libsmb2; do
-    url="$(awk -v name="$dep" '$1 == name \\( $0 ~ name \\) {print $3; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
+    url="$(awk -v name="$dep" '$1 == name ":" {print $3; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
     sha="$(awk -v name="$dep" '$1 == name {print $2; exit}' "$RESONANCE_DIR/patches/BASE.txt")"
     [[ -n "$url" && -n "$sha" ]] || fail "Could not read pinned $dep source from patches/BASE.txt."
     if [[ ! -d "$PS4_BUILD_ROOT/src/$dep/.git" ]]; then
