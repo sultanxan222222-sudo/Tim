@@ -1,21 +1,18 @@
-# Applying WHAT'S NEXT to Resonance
+# WHAT'S NEXT renderer integration
 
-The overlay patch in `dreamcast/patches/resonance-whats-next.patch` connects the tested WHAT'S NEXT history/cadence bridge to Resonance's existing Vulkan frame generator. It does **not** add a competing interpolation shader: `FrameGenerator::Prepare/Draw` remain the GPU motion-estimation and interpolation backend.
+The integration is applied by the exact-anchor script:
 
-## Apply order
+```sh
+scripts/apply-resonance-whats-next.sh /absolute/path/to/flycast-after-resonance-patch
+```
 
-1. Prepare Resonance's pinned Flycast checkout as described in its BUILDING.md.
-2. Apply Resonance's own `patches/flycast-ps4.patch` to that Flycast checkout first.
-3. From this Tim repository, run:
+The target tree must first be checked out at the Flycast revision pinned in Resonance's `patches/BASE.txt` and have Resonance's `patches/flycast-ps4.patch` applied. The script copies the host-tested WHAT'S NEXT lifecycle module into `core/rend/vulkan/whats_next`, registers the needed sources with CMake, and hooks its cadence/history decision into the existing `FrameGenerator::Prepare/Draw` flow.
 
-   ```sh
-   scripts/apply-resonance-whats-next.sh /absolute/path/to/resonance-build/src/flycast
-   ```
+The GitHub Actions workflow `Resonance overlay compatibility` clones that exact Flycast base, applies the current Resonance patch, runs the integration script, and verifies that the new sources and bridge call are present. This proves patch application and source registration—not PS4 compilation or runtime correctness.
 
-   The script performs `git apply --check` before changing files.
+## Remaining work
 
-## Integration scope and remaining validation
-
-The patch adds the backend-neutral history/cadence sources to the Vulkan target, gates the existing interpolation pass through WHAT'S NEXT, and invalidates history on extent changes and GUI transitions. The patch currently labels the Flycast presentation image as RGBA8. This is an integration assumption, not a console-verified fact; confirm the actual framebuffer format before relying on the gate for every renderer configuration.
-
-This is an overlay patch committed in Tim; it has not been applied to or committed into the third-party Resonance repository. A successful host CI run for Tim does not prove that the PS4 Vulkan target compiles. Build with Resonance's documented PS4 toolchain and test on console before treating this as a usable PS4 package. Mini-DLSS's spatial shader is not yet wired into this patch.
+- Compile the integrated Vulkan target with Resonance's PS4 toolchain.
+- Verify the actual presentation image format; the adapter currently declares RGBA8 and that assumption must be checked against the renderer.
+- Connect Mini-DLSS as a real GPU post-processing/upscaling stage for both source and generated frames. The current edge-aware sharpening shader is only a prototype and is not yet part of the renderer.
+- Test latency, visual artifacts, memory use, and frame pacing on the console before packaging a PKG.
