@@ -1,6 +1,6 @@
 # WHAT'S NEXT renderer integration
 
-The integration is applied by the exact-anchor script. It now also inserts a conservative, edge-aware Mini-DLSS spatial finishing operation into Resonance's existing frame-generation fragment shader, avoiding a separate offscreen target for this first live-renderer stage:
+The integration is applied by the exact-anchor script. It inserts a conservative, edge-aware Mini-DLSS spatial finishing operation into Resonance's existing frame-generation fragment shader and creates a separate PS4 presentation shader variant for ordinary game frames. It avoids an extra offscreen target and leaves menu/UI rendering on the original shader path:
 
 ```sh
 scripts/apply-resonance-whats-next.sh /absolute/path/to/flycast-after-resonance-patch
