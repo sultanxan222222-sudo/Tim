@@ -150,6 +150,20 @@ def main() -> None:
         '\tbool fgRealPending = false;\n\twhats_next::FrameGenerationBridge whatsNextBridge;\n'
         '\tu64 fgResourceGeneration = 1;\n\tu64 fgGameSession = 1;\n\tbool fgWasGuiOpen = false;\n'
     )
+    # Fail closed if the bridge was copied but its lifecycle hooks did not land.
+    integrated_context = context_cpp.read_text(encoding="utf-8")
+    required_hooks = (
+        "whatsNextBridge.begin_real_frame",
+        "sourceAccepted = true",
+        "whatsNextBridge.commit_real_frame",
+        "whatsNextBridge.reset()",
+    )
+    missing_hooks = [hook for hook in required_hooks if hook not in integrated_context]
+    if missing_hooks:
+        raise SystemExit("Renderer integration incomplete; missing hooks: " + ", ".join(missing_hooks))
+    if "Mini-DLSS spatial finishing pass" not in frame_gen_cpp.read_text(encoding="utf-8"):
+        raise SystemExit("Mini-DLSS spatial finishing pass was not installed.")
+
     print(f"WHAT'S NEXT lifecycle bridge integrated into {root}")
 
 
