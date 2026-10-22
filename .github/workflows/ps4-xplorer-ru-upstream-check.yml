@@ -47,6 +47,8 @@ jobs:
             sha256sum ps4-xplorer-ru.patch
             echo "Notice: this is a source patch only, not a compiled PS4 PKG."
           } > patch-report.txt
+      - name: Validate exported patch contents
+        run: python file-manager/PS4-Xplorer-RU/tests/validate_exported_patch.py ps4-xplorer-ru.patch
       - name: Upload source patch and report
         uses: actions/upload-artifact@v4
         with:
