@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 CONTROLLER = ROOT / "upstream/Assets/Codigos/Controlador.cs"
 OPTIONS = ROOT / "upstream/Assets/Codigos/Opciones.cs"
+ADVANCED = ROOT / "upstream/Assets/Codigos/OpcionesAvanzadas.cs"
 DICTIONARY = ROOT / "ru-RU.json"
 
 def require(condition, message):
@@ -15,9 +16,12 @@ def require(condition, message):
 def main():
     controller = CONTROLLER.read_text(encoding="utf-8-sig")
     options = OPTIONS.read_text(encoding="utf-8-sig")
+    advanced = ADVANCED.read_text(encoding="utf-8-sig")
     dictionary = json.loads(DICTIONARY.read_text(encoding="utf-8"))
     require("case SystemLanguage.Russian:" in controller, "Russian controller case missing")
     require("case SystemLanguage.Russian:" in options, "Russian options case missing")
+    require("FTP-сервер" in advanced, "Russian FTP label missing")
+    require("Полный доступ (чтение/запись)" in advanced, "Russian full access label missing")
     for label in ("Перемещение...", "Копирование...", "Сначала скопируйте", "Справка"):
         require(label in controller, f"controller translation missing: {label}")
     for label in ("Создать папку", "Вырезать", "Копировать", "Вставить", "Переименовать", "Удалить"):
