@@ -5,10 +5,6 @@
 
 #ifdef __cplusplus
 extern "C" {
-#ifdef __cplusplus
-}
-#endif
-
 #endif
 
 typedef struct tim_file_browser {
@@ -27,10 +23,14 @@ int tim_fm_select(tim_file_browser *browser, size_t index);
 int tim_fm_enter_selected(tim_file_browser *browser);
 int tim_fm_parent(tim_file_browser *browser);
 
-/* Copy the selected regular file into destination_directory without overwrite. */
+/* Copy the selected file or directory into destination_directory without overwrite. */
 int tim_fm_copy_selected(const tim_file_browser *browser,
                          const char *destination_directory,
                          tim_copy_progress_fn progress,
                          void *userdata);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
