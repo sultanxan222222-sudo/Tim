@@ -11,7 +11,7 @@
 #define MAX_ROOTS 8
 static const char *USB_CANDIDATES[] = {
     "/mnt/usb0", "/mnt/usb1", "/mnt/usb2", "/mnt/usb3",
-    "/mnt/ext0", "/mnt/ext1", "/mnt/usb"
+    "/mnt/usb4", "/mnt/usb5", "/mnt/ext0", "/mnt/ext1"
 };
 static const char *HDD_CANDIDATES[] = {
     "/data", "/user/data", "/mnt/sandbox"
@@ -84,7 +84,7 @@ int main(void) {
     memset(&src,0,sizeof(src)); memset(&dst,0,sizeof(dst));
     int src_ok=usb_count>0 && open_browser(&src,usb_roots[0])==0;
     int dst_ok=hdd_count>0 && open_browser(&dst,hdd_roots[0])==0;
-    int active=0,previous=0,frame=0,notice=0;
+    int active=0,previous=0,frame=0,src_root_index=0,dst_root_index=0;
     char message[128]="READY";
     const Color white=rgb(235,242,255), muted=rgb(135,157,183), cyan=rgb(50,220,220);
     for(;;) {
@@ -92,6 +92,28 @@ int main(void) {
         int buttons=(int)state.buttons;
         if((buttons&ORBIS_PAD_BUTTON_L1)&&!(previous&ORBIS_PAD_BUTTON_L1)) active=0;
         if((buttons&ORBIS_PAD_BUTTON_R1)&&!(previous&ORBIS_PAD_BUTTON_R1)) active=1;
+        if((buttons&ORBIS_PAD_BUTTON_L2)&&!(previous&ORBIS_PAD_BUTTON_L2)) {
+            if(active && hdd_count>1) {
+                tim_fm_close(&dst); dst_root_index=(dst_root_index+hdd_count-1)%hdd_count;
+                dst_ok=open_browser(&dst,hdd_roots[dst_root_index])==0;
+                snprintf(message,sizeof(message),"DESTINATION ROOT CHANGED");
+            } else if(!active && usb_count>1) {
+                tim_fm_close(&src); src_root_index=(src_root_index+usb_count-1)%usb_count;
+                src_ok=open_browser(&src,usb_roots[src_root_index])==0;
+                snprintf(message,sizeof(message),"USB ROOT CHANGED");
+            }
+        }
+        if((buttons&ORBIS_PAD_BUTTON_R2)&&!(previous&ORBIS_PAD_BUTTON_R2)) {
+            if(active && hdd_count>1) {
+                tim_fm_close(&dst); dst_root_index=(dst_root_index+1)%hdd_count;
+                dst_ok=open_browser(&dst,hdd_roots[dst_root_index])==0;
+                snprintf(message,sizeof(message),"DESTINATION ROOT CHANGED");
+            } else if(!active && usb_count>1) {
+                tim_fm_close(&src); src_root_index=(src_root_index+1)%usb_count;
+                src_ok=open_browser(&src,usb_roots[src_root_index])==0;
+                snprintf(message,sizeof(message),"USB ROOT CHANGED");
+            }
+        }
         tim_file_browser *b=active?&dst:&src;
         int ok=active?dst_ok:src_ok;
         if(ok && (buttons&ORBIS_PAD_BUTTON_UP)&&!(previous&ORBIS_PAD_BUTTON_UP)&&b->count)
@@ -122,7 +144,7 @@ int main(void) {
         previous=buttons;
         scene->FrameBufferClear(); rect(scene,0,0,1920,1080,8,14,25); rect(scene,0,0,1920,9,50,220,220);
         text(scene,"TIM FILE MANAGER",100,55,6,cyan);
-        text(scene,"L1 SOURCE USB   R1 DESTINATION HDD",105,135,3,white);
+        text(scene,"L1 SOURCE USB   R1 DESTINATION HDD   L2/R2 CHANGE ROOT",105,135,3,white);
         rect(scene,80,205,850,700,active?20:28,active?33:48,active?52:70);
         rect(scene,990,205,850,700,active?28:20,active?48:33,active?70:52);
         text(scene,"USB SOURCE",110,230,3,active?muted:cyan);
