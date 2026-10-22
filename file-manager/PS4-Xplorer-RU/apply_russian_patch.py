@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
-"""Apply the initial Russian-language additions to a PS4-Xplorer Unity source checkout.
+"""Safely apply the initial Russian localization to a PS4-Xplorer Unity checkout.
 
-This intentionally refuses to overwrite an already translated source file. The
-upstream public source may not match the latest 2.08 binary, so always review
-the diff and build/test with the matching Unity PS4 project before packaging.
+This is a partial source patch, not a PKG builder. Always review the resulting
+diff and build with the matching Unity PS4 toolchain before installing anything.
 """
+import argparse
+import os
+import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-SOURCE_ROOT = ROOT / "PS4-Xplorer" / "Assets" / "Codigos"
+DEFAULT_SOURCE_ROOT = ROOT / "PS4-Xplorer" / "Assets" / "Codigos"
 
-CONTROLADOR_CASE = '''            case SystemLanguage.Russian:
+CONTROLADOR_CASE = r'''            case SystemLanguage.Russian:
                 CadenaMoviendo = "Перемещение...";
                 CadenaCopiando = "Копирование...";
                 CadenaNoHasCopiado = "Сначала скопируйте или вырежьте файл для вставки";
@@ -31,28 +33,7 @@ OPCIONES_CASE = '''            case SystemLanguage.Russian:
                 break;
 '''
 
-def insert_case(path: Path, block: str) -> None:
-    if not path.is_file():
-        raise SystemExit(f"Не найден исходный файл: {path}")
-    text = path.read_text(encoding="utf-8-sig")
-    if "case SystemLanguage.Russian:" in text:
-        raise SystemExit(f"Русская локализация уже есть в {path}; файл не изменён.")
-    anchor = "            case SystemLanguage.Spanish:"
-    if anchor not in text:
-        raise SystemExit(f"Не найден ожидаемый блок Spanish в {path}; файл не изменён.")
-    text = text.replace(anchor, block + anchor, 1)
-    path.write_text(text, encoding="utf-8-sig", newline="")
-
-def patch_advanced_options(path: Path) -> None:
-    if not path.is_file():
-        raise SystemExit(f"Не найден исходный файл: {path}")
-    text = path.read_text(encoding="utf-8-sig")
-    if "FTP-сервер" in text and "Полный доступ (чтение/запись)" in text:
-        raise SystemExit(f"Русские подписи уже есть в {path}; файл не изменён.")
-    anchor = "    public void OnDisable()"
-    if anchor not in text:
-        raise SystemExit(f"Не найден ожидаемый метод OnDisable в {path}; файл не изменён.")
-    block = '''    public void Awake()
+ADVANCED_BLOCK = '''    public void Awake()
     {
         if (Application.systemLanguage != SystemLanguage.Russian || MisOpciones == null)
             return;
@@ -73,15 +54,72 @@ def patch_advanced_options(path: Path) -> None:
     }
 
 '''
-    text = text.replace(anchor, block + anchor, 1)
-    path.write_text(text, encoding="utf-8-sig", newline="")
 
-def main():
-    insert_case(SOURCE_ROOT / "Controlador.cs", CONTROLADOR_CASE)
-    insert_case(SOURCE_ROOT / "Opciones.cs", OPCIONES_CASE)
-    patch_advanced_options(SOURCE_ROOT / "OpcionesAvanzadas.cs")
-    print("Добавлены русские подписи в Controlador.cs, Opciones.cs и OpcionesAvanzadas.cs.")
-    print("Это не полная локализация: проверьте остальные экраны и соберите проект в совместимой Unity PS4-среде.")
+def read_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8-sig")
+
+def write_atomic(path: Path, content: str) -> None:
+    fd, temp_name = tempfile.mkstemp(prefix=path.name + ".", suffix=".tmp", dir=str(path.parent))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8-sig", newline="") as stream:
+            stream.write(content)
+        os.replace(temp_name, path)
+    except Exception:
+        try:
+            os.unlink(temp_name)
+        except OSError:
+            pass
+        raise
+
+def plan_case(path: Path, block: str) -> str:
+    if not path.is_file():
+        raise SystemExit(f"Не найден исходный файл: {path}")
+    source = read_text(path)
+    if "case SystemLanguage.Russian:" in source:
+        raise SystemExit(f"В {path} уже есть русский case. Ничего не изменено; проверьте файл вручную.")
+    anchor = "            case SystemLanguage.Spanish:"
+    if source.count(anchor) != 1:
+        raise SystemExit(f"Ожидался ровно один блок Spanish в {path}; найдено: {source.count(anchor)}. Ничего не изменено.")
+    return source.replace(anchor, block + anchor, 1)
+
+def plan_advanced(path: Path) -> str:
+    if not path.is_file():
+        raise SystemExit(f"Не найден исходный файл: {path}")
+    source = read_text(path)
+    has_ftp = "FTP-сервер" in source
+    has_rw = "Полный доступ (чтение/запись)" in source
+    has_awake = "public void Awake()" in source
+    if has_ftp or has_rw or has_awake:
+        raise SystemExit(f"В {path} уже есть Awake/русские подписи. Ничего не изменено; проверьте файл вручную.")
+    anchor = "    public void OnDisable()"
+    if source.count(anchor) != 1:
+        raise SystemExit(f"Ожидался ровно один OnDisable в {path}; найдено: {source.count(anchor)}. Ничего не изменено.")
+    return source.replace(anchor, ADVANCED_BLOCK + anchor, 1)
+
+def build_plan(source_root: Path):
+    targets = {
+        source_root / "Controlador.cs": plan_case(source_root / "Controlador.cs", CONTROLADOR_CASE),
+        source_root / "Opciones.cs": plan_case(source_root / "Opciones.cs", OPCIONES_CASE),
+        source_root / "OpcionesAvanzadas.cs": plan_advanced(source_root / "OpcionesAvanzadas.cs"),
+    }
+    return targets
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description="Добавить частичную русификацию PS4-Xplorer в копию Unity-исходников.")
+    parser.add_argument("--source-root", type=Path, default=DEFAULT_SOURCE_ROOT,
+                        help="путь к каталогу Assets/Codigos исходного Unity-проекта")
+    parser.add_argument("--dry-run", action="store_true", help="проверить совместимость файлов, ничего не записывая")
+    args = parser.parse_args(argv)
+    source_root = args.source_root.resolve()
+    plan = build_plan(source_root)  # preflight all files before writing any of them
+    if args.dry_run:
+        print(f"DRY RUN: проверены {len(plan)} файлов; изменения не записаны.")
+        return 0
+    for path, updated in plan.items():
+        write_atomic(path, updated)
+    print(f"Готово: обновлены {len(plan)} файла(ов) в {source_root}.")
+    print("Это частичная локализация, не полная сборка и не PKG. Проверьте diff и соберите в Unity.")
+    return 0
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())
