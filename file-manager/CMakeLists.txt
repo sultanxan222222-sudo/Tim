@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.16)
-project(tim_file_manager_core C)
+project(tim_file_manager_core C CXX)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -21,3 +21,10 @@ if(BUILD_TESTING)
   endif()
   add_test(NAME file_ops COMMAND test_file_ops)
 endif()
+
+add_executable(test_cpp_linkage tests/test_cpp_linkage.cpp)
+target_link_libraries(test_cpp_linkage PRIVATE tim_file_ops)
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(test_cpp_linkage PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+add_test(NAME cpp_linkage COMMAND test_cpp_linkage)
