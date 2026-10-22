@@ -1,0 +1,67 @@
+name: Build TIM PS4 File Manager PKG
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "file-manager/**"
+      - ".github/workflows/file-manager-ps4.yml"
+      - "native/ps4/platform/**"
+      - "native/ps4/scripts/make_icon.py"
+  pull_request:
+    paths:
+      - "file-manager/**"
+      - ".github/workflows/file-manager-ps4.yml"
+      - "native/ps4/platform/**"
+      - "native/ps4/scripts/make_icon.py"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-pkg:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go for OpenOrbis packaging helpers
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+
+      - name: Build create-fself helper
+        run: |
+          git clone --depth 1 https://github.com/OpenOrbis/create-fself.git /tmp/create-fself
+          mkdir -p file-manager/ps4/tools
+          cd /tmp/create-fself/cmd/create-fself
+          go build -modfile=go-linux.mod -o "$GITHUB_WORKSPACE/file-manager/ps4/tools/create-fself" .
+
+      - name: Build create-gp4 helper
+        run: |
+          git clone --depth 1 https://github.com/OpenOrbis/create-gp4.git /tmp/create-gp4
+          cd /tmp/create-gp4/cmd/create-gp4
+          go build -o "$GITHUB_WORKSPACE/file-manager/ps4/tools/create-gp4" .
+
+      - name: Generate application icon
+        run: python3 native/ps4/scripts/make_icon.py file-manager/ps4/sce_sys/icon0.png
+
+      - name: Compile and package with OpenOrbis
+        run: |
+          docker run --rm --user 0 \
+            -v "$PWD:/workspace" \
+            -w /workspace \
+            openorbisofficial/toolchain:latest \
+            bash -lc 'cd file-manager/ps4 && make clean all'
+
+      - name: Verify package exists
+        run: test -s file-manager/ps4/IV0000-TIMF00001_00-TIMFILEMANAGER001.pkg
+
+      - name: Upload installable package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: TIM-PS4-File-Manager-PKG
+          path: file-manager/ps4/IV0000-TIMF00001_00-TIMFILEMANAGER001.pkg
+          if-no-files-found: error
