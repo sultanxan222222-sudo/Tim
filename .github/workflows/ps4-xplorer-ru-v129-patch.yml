@@ -19,7 +19,7 @@ jobs:
       - name: Check out our patch scripts
         uses: actions/checkout@v4
       - name: Run patcher unit tests
-        run: python -m unittest file-manager/PS4-Xplorer-RU/tests/test_v129_polish.py
+        run: python file-manager/PS4-Xplorer-RU/tests/test_v129_polish.py
       - name: Check out full v1.29 source project
         uses: actions/checkout@v4
         with:
