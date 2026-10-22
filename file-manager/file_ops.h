@@ -20,6 +20,13 @@ int tim_copy_regular_file(const char *source,
                           tim_copy_progress_fn progress,
                           void *userdata);
 
+/* Recursively copy a directory to a new destination directory. Refuses to
+   overwrite any destination. On failure, already copied children may remain. */
+int tim_copy_directory(const char *source,
+                       const char *destination,
+                       tim_copy_progress_fn progress,
+                       void *userdata);
+
 /* Returns 0 on success, -1 on failure. Only returns regular files/directories
    and skips "." and "..". The caller owns the returned memory. */
 typedef struct tim_dir_entry {
