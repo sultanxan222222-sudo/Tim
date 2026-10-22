@@ -20,5 +20,9 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
+      - name: Check patcher syntax
+        run: python -m py_compile file-manager/PS4-Xplorer-RU/apply_russian_patch.py
       - name: Validate Russian localization files
         run: python file-manager/PS4-Xplorer-RU/tests/check_localization.py
+      - name: Test patcher with temporary fixtures
+        run: python file-manager/PS4-Xplorer-RU/tests/test_patch_script.py
