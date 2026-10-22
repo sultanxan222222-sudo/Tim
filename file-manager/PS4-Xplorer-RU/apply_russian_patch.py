@@ -83,7 +83,7 @@ def plan_case(path: Path, block: str) -> str:
     if source.count(anchor) != 1:
         raise SystemExit(f"Ожидался ровно один блок Spanish в {path}; найдено: {source.count(anchor)}. Ничего не изменено.")
     newline = "\r\n" if "\r\n" in source else "\n"
-    block = block.replace("\\n", newline)
+    block = block.replace("\n", newline)
     return source.replace(anchor, block + anchor, 1)
 
 def plan_advanced(path: Path) -> str:
@@ -99,7 +99,7 @@ def plan_advanced(path: Path) -> str:
     if source.count(anchor) != 1:
         raise SystemExit(f"Ожидался ровно один OnDisable в {path}; найдено: {source.count(anchor)}. Ничего не изменено.")
     newline = "\r\n" if "\r\n" in source else "\n"
-    block = ADVANCED_BLOCK.replace("\\n", newline)
+    block = ADVANCED_BLOCK.replace("\n", newline)
     return source.replace(anchor, block + anchor, 1)
 
 def build_plan(source_root: Path):
