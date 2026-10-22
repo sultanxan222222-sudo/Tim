@@ -91,6 +91,61 @@ done:
     return result;
 }
 
+
+static int tim_join_path(char *out, size_t capacity, const char *base, const char *name) {
+    size_t base_len;
+    int n;
+    if (!out || !base || !name || !name[0] || strchr(name, '/') ||
+        !strcmp(name, ".") || !strcmp(name, "..")) {
+        errno = EINVAL;
+        return -1;
+    }
+    base_len = strlen(base);
+    n = snprintf(out, capacity, "%s%s%s", base,
+                 (base_len && base[base_len - 1] == '/') ? "" : "/", name);
+    if (n < 0) { errno = EIO; return -1; }
+    if ((size_t)n >= capacity) { errno = ENAMETOOLONG; return -1; }
+    return 0;
+}
+
+int tim_copy_directory(const char *source, const char *destination,
+                       tim_copy_progress_fn progress, void *userdata) {
+    struct stat source_st;
+    tim_dir_entry *entries = NULL;
+    size_t count = 0, i;
+    int saved_errno = 0, result = -1;
+
+    if (!source || !destination || !strcmp(source, destination)) {
+        errno = EINVAL;
+        return -1;
+    }
+    if (lstat(source, &source_st) != 0) return -1;
+    if (!S_ISDIR(source_st.st_mode)) { errno = ENOTDIR; return -1; }
+    if (mkdir(destination, source_st.st_mode & 0777) != 0) return -1;
+    if (tim_list_directory(source, &entries, &count) != 0) goto done;
+
+    for (i = 0; i < count; ++i) {
+        char src_child[TIM_PATH_MAX], dst_child[TIM_PATH_MAX];
+        if (tim_join_path(src_child, sizeof(src_child), source, entries[i].name) != 0 ||
+            tim_join_path(dst_child, sizeof(dst_child), destination, entries[i].name) != 0)
+            goto done;
+        if (entries[i].is_directory) {
+            if (tim_copy_directory(src_child, dst_child, progress, userdata) != 0)
+                goto done;
+        } else {
+            if (tim_copy_regular_file(src_child, dst_child, progress, userdata) != 0)
+                goto done;
+        }
+    }
+    result = 0;
+
+done:
+    saved_errno = errno;
+    tim_free_directory(entries, count);
+    errno = saved_errno;
+    return result;
+}
+
 int tim_list_directory(const char *path, tim_dir_entry **entries, size_t *count) {
     DIR *dir;
     struct dirent *de;
