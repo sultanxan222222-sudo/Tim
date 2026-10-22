@@ -1,5 +1,6 @@
 #define _POSIX_C_SOURCE 200809L
 #include "file_ops.h"
+#include "file_browser.h"
 
 #include <errno.h>
 #include <stdio.h>
@@ -50,6 +51,7 @@ int main(void) {
     char temp[] = "/tmp/tim-file-ops-XXXXXX";
     char source[256], destination[256], existing[256], cancelled[256], folder[256];
     tim_dir_entry *entries = NULL;
+    tim_file_browser browser;
     size_t count = 0, i;
     int calls = 0, found_file = 0, found_folder = 0;
 
@@ -82,6 +84,22 @@ int main(void) {
     }
     CHECK(found_file && found_folder);
     tim_free_directory(entries, count);
+
+    CHECK(tim_fm_open(&browser, temp) == 0);
+    CHECK(tim_fm_parent(&browser) == 0); /* root cannot be escaped */
+    for (i = 0; i < browser.count; ++i) {
+        if (!strcmp(browser.entries[i].name, "source.txt")) break;
+    }
+    CHECK(i < browser.count);
+    CHECK(tim_fm_select(&browser, i) == 0);
+    CHECK(tim_fm_copy_selected(&browser, folder, NULL, NULL) == 0);
+    {
+        char copied_into_folder[256];
+        CHECK(snprintf(copied_into_folder, sizeof(copied_into_folder), "%s/source.txt", folder) > 0);
+        CHECK(file_equals(copied_into_folder, "PS4 file manager test payload"));
+        CHECK(unlink(copied_into_folder) == 0);
+    }
+    tim_fm_close(&browser);
 
     CHECK(unlink(source) == 0);
     CHECK(unlink(destination) == 0);
