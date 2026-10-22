@@ -100,7 +100,7 @@ public class Controlador : MonoBehaviour {
                 CadenaCopiando = "Копирование...";
                 CadenaNoHasCopiado = "Сначала скопируйте или вырежьте файл для вставки";
                 CadenaErrorCrearCarpeta = "Папка с таким именем уже существует";
-                textoOptions.text = "OPTIONS\\nсправка";
+                textoOptions.text = "OPTIONS\nСправка";
                 break;
             case SystemLanguage.Spanish:
                 CadenaMoviendo = "Moviendo...";
