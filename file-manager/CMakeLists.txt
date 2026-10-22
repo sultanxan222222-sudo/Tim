@@ -1,0 +1,23 @@
+cmake_minimum_required(VERSION 3.16)
+project(tim_file_manager_core C)
+
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
+
+add_library(tim_file_ops file_ops.c)
+target_include_directories(tim_file_ops PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+
+if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+  target_compile_options(tim_file_ops PRIVATE -Wall -Wextra -Wpedantic -Werror)
+endif()
+
+include(CTest)
+if(BUILD_TESTING)
+  add_executable(test_file_ops tests/test_file_ops.c)
+  target_link_libraries(test_file_ops PRIVATE tim_file_ops)
+  if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
+    target_compile_options(test_file_ops PRIVATE -Wall -Wextra -Wpedantic -Werror)
+  endif()
+  add_test(NAME file_ops COMMAND test_file_ops)
+endif()
