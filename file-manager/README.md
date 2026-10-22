@@ -11,8 +11,11 @@ Browse a USB drive that the console has mounted and copy files to a user-selecte
 - `tests/test_file_ops.c`: host tests for copying, no-overwrite behavior, cancellation cleanup, directory listing, rooted navigation, and browser copy flow.
 - `CMakeLists.txt` and `.github/workflows/file-manager-core.yml`: compile with strict warnings and run the host-side tests automatically.
 
+## Native PS4 application
+A separate native target now exists in `ps4/`, with a controller-driven two-pane browser, runtime checks for candidate USB/HDD paths, and copy actions backed by the tested file-operation core. See [`ps4/README.md`](ps4/README.md) for controls and limitations. The OpenOrbis package workflow is `.github/workflows/file-manager-ps4.yml`; a PKG is only available if that workflow completes successfully and uploads its artifact.
+
 ## Build and console status
-The host-side core checks pass in GitHub Actions. This verifies portable file operations only; it does **not** prove PS4 compatibility.
+The host-side core checks pass in GitHub Actions. This verifies portable file operations only; it does **not** prove PS4 compatibility. A successful OpenOrbis package build also does not prove it launches or copies files correctly on a real PS4.
 
 **There is not yet a finished installable file-manager PKG.** Remaining work: connect these modules to a PS4 controller/rendering UI, discover mounted USB and writable HDD locations at runtime, handle directory-copy UX and free-space errors, link with the pinned OpenOrbis toolchain, package the app, and test launch/copy behavior on the user's PS4 with HEN on firmware 13.02.
 
