@@ -1,0 +1,63 @@
+name: PS4-Xplorer RU v1.29 source patch
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - ps4-xplorer-russian
+    paths:
+      - "file-manager/PS4-Xplorer-RU/**"
+      - ".github/workflows/ps4-xplorer-ru-v129-patch.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out our patch scripts
+        uses: actions/checkout@v4
+      - name: Run patcher unit tests
+        run: python -m unittest file-manager/PS4-Xplorer-RU/tests/test_v129_polish.py
+      - name: Check out full v1.29 source project
+        uses: actions/checkout@v4
+        with:
+          repository: chris7395328/PS4-Xplorer
+          ref: main
+          path: file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129
+          persist-credentials: false
+      - name: Verify expected source revision and Unity version
+        shell: bash
+        run: |
+          test -f file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129/ProjectSettings/ProjectVersion.txt
+          grep -q '2017.2.0p2' file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129/ProjectSettings/ProjectVersion.txt
+          git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129 rev-parse HEAD > upstream-v129-revision.txt
+      - name: Preflight patch
+        run: python file-manager/PS4-Xplorer-RU/apply_v129_russian_polish.py --source-root file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129/Assets/Codigos --dry-run
+      - name: Apply Russian wording improvements
+        run: python file-manager/PS4-Xplorer-RU/apply_v129_russian_polish.py --source-root file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129/Assets/Codigos
+      - name: Check patch whitespace
+        run: git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129 -c core.whitespace=cr-at-eol diff --check
+      - name: Export patch and report
+        shell: bash
+        run: |
+          git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129 diff --binary -- Assets/Codigos/Controlador.cs Assets/Codigos/Opciones.cs Assets/Codigos/OpcionesAvanzadas.cs > ps4-xplorer-ru-v129.patch
+          {
+            echo "Upstream repository: chris7395328/PS4-Xplorer"
+            echo "Upstream revision: $(cat upstream-v129-revision.txt)"
+            echo "Unity editor version: $(cat file-manager/PS4-Xplorer-RU/PS4-Xplorer-v129/ProjectSettings/ProjectVersion.txt)"
+            echo "Patch SHA-256:"
+            sha256sum ps4-xplorer-ru-v129.patch
+            echo "NOTICE: source patch only; no Unity PS4 build or PKG creation was performed."
+          } > ps4-xplorer-ru-v129-report.txt
+          test -s ps4-xplorer-ru-v129.patch
+      - name: Upload patch artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps4-xplorer-ru-v129-source-patch
+          path: |
+            ps4-xplorer-ru-v129.patch
+            ps4-xplorer-ru-v129-report.txt
+          if-no-files-found: error
+          retention-days: 30
