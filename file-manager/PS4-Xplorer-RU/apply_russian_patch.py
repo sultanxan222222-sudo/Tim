@@ -43,10 +43,44 @@ def insert_case(path: Path, block: str) -> None:
     text = text.replace(anchor, block + anchor, 1)
     path.write_text(text, encoding="utf-8-sig", newline="")
 
+def patch_advanced_options(path: Path) -> None:
+    if not path.is_file():
+        raise SystemExit(f"Не найден исходный файл: {path}")
+    text = path.read_text(encoding="utf-8-sig")
+    if "FTP-сервер" in text and "Полный доступ (чтение/запись)" in text:
+        raise SystemExit(f"Русские подписи уже есть в {path}; файл не изменён.")
+    anchor = "    public void OnDisable()"
+    if anchor not in text:
+        raise SystemExit(f"Не найден ожидаемый метод OnDisable в {path}; файл не изменён.")
+    block = '''    public void Awake()
+    {
+        if (Application.systemLanguage != SystemLanguage.Russian || MisOpciones == null)
+            return;
+
+        if (MisOpciones.Length > 0 && MisOpciones[0] != null)
+        {
+            var label = MisOpciones[0].GetComponentInChildren<UnityEngine.UI.Text>();
+            if (label != null)
+                label.text = "FTP-сервер";
+        }
+
+        if (MisOpciones.Length > 1 && MisOpciones[1] != null)
+        {
+            var label = MisOpciones[1].GetComponentInChildren<UnityEngine.UI.Text>();
+            if (label != null)
+                label.text = "Полный доступ (чтение/запись)";
+        }
+    }
+
+'''
+    text = text.replace(anchor, block + anchor, 1)
+    path.write_text(text, encoding="utf-8-sig", newline="")
+
 def main():
     insert_case(SOURCE_ROOT / "Controlador.cs", CONTROLADOR_CASE)
     insert_case(SOURCE_ROOT / "Opciones.cs", OPCIONES_CASE)
-    print("Добавлены начальные русские переводы в Controlador.cs и Opciones.cs.")
+    patch_advanced_options(SOURCE_ROOT / "OpcionesAvanzadas.cs")
+    print("Добавлены русские подписи в Controlador.cs, Opciones.cs и OpcionesAvanzadas.cs.")
     print("Это не полная локализация: проверьте остальные экраны и соберите проект в совместимой Unity PS4-среде.")
 
 if __name__ == "__main__":
