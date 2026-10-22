@@ -92,6 +92,15 @@ done:
 }
 
 
+static int tim_path_is_same_or_descendant(const char *parent, const char *candidate) {
+    size_t n = strlen(parent);
+    while (n > 1 && parent[n - 1] == '/') --n;
+    if (strncmp(parent, candidate, n) != 0) return 0;
+    if (candidate[n] == '\0') return 1;
+    if (n == 1 && parent[0] == '/') return candidate[0] == '/';
+    return candidate[n] == '/';
+}
+
 static int tim_join_path(char *out, size_t capacity, const char *base, const char *name) {
     size_t base_len;
     int n;
@@ -115,7 +124,8 @@ int tim_copy_directory(const char *source, const char *destination,
     size_t count = 0, i;
     int saved_errno = 0, result = -1;
 
-    if (!source || !destination || !strcmp(source, destination)) {
+    if (!source || !destination || !strcmp(source, destination) ||
+        tim_path_is_same_or_descendant(source, destination)) {
         errno = EINVAL;
         return -1;
     }
