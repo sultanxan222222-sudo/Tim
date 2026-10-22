@@ -1,0 +1,24 @@
+name: PS4-Xplorer RU static checks
+
+on:
+  push:
+    branches:
+      - ps4-xplorer-russian
+  pull_request:
+    branches:
+      - main
+      - ps4-xplorer-russian
+  workflow_dispatch:
+
+jobs:
+  localization-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: Validate Russian localization files
+        run: python file-manager/PS4-Xplorer-RU/tests/check_localization.py
