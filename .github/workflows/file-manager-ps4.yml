@@ -57,11 +57,11 @@ jobs:
             bash -lc 'cd file-manager/ps4 && make clean all'
 
       - name: Verify package exists
-        run: test -s file-manager/ps4/IV0000-TIMF00001_00-TIMFILEMANAGER001.pkg
+        run: test -s file-manager/ps4/IV0000-TIMF00001_00-TIMFMANAGER00001.pkg
 
       - name: Upload installable package artifact
         uses: actions/upload-artifact@v4
         with:
           name: TIM-PS4-File-Manager-PKG
-          path: file-manager/ps4/IV0000-TIMF00001_00-TIMFILEMANAGER001.pkg
+          path: file-manager/ps4/IV0000-TIMF00001_00-TIMFMANAGER00001.pkg
           if-no-files-found: error
