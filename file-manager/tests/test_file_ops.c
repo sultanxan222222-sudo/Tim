@@ -95,7 +95,9 @@ int main(void) {
     CHECK(found_file && found_folder);
     tim_free_directory(entries, count);
 
-    CHECK(tim_copy_directory(tree, tree_inside, NULL, NULL) == -1); /* reject destination inside source */\n    CHECK(access(tree_inside, F_OK) != 0);\n    CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == 0);
+    CHECK(tim_copy_directory(tree, tree_inside, NULL, NULL) == -1); /* reject destination inside source */
+    CHECK(access(tree_inside, F_OK) != 0);
+    CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == 0);
     CHECK(file_equals(tree_copy_file, "nested directory payload"));
     CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == -1); /* no overwrite */
 
