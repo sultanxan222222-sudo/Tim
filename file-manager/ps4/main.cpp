@@ -151,16 +151,20 @@ int main(void) {
         text(scene,"HDD DESTINATION",1020,230,3,active?cyan:muted);
         if(src_ok) {
             text(scene,src.current,110,275,2,white);
-            for(size_t i=0;i<src.count && i<12;i++) {
+            size_t first=src.selected>=12?src.selected-11:0;
+            for(size_t row=0;row<12 && first+row<src.count;row++) {
+                size_t i=first+row;
                 char line[128]; snprintf(line,sizeof(line),"%c %s%s",i==src.selected?'>':' ',src.entries[i].is_directory?"[DIR] ":"",src.entries[i].name);
-                text(scene,line,115,325+(int)i*42,2,i==src.selected?cyan:white);
+                text(scene,line,115,325+(int)row*42,2,i==src.selected?cyan:white);
             }
         } else text(scene,"NO READABLE USB MOUNT FOUND",115,330,2,muted);
         if(dst_ok) {
             text(scene,dst.current,1020,275,2,white);
-            for(size_t i=0;i<dst.count && i<12;i++) {
+            size_t first=dst.selected>=12?dst.selected-11:0;
+            for(size_t row=0;row<12 && first+row<dst.count;row++) {
+                size_t i=first+row;
                 char line[128]; snprintf(line,sizeof(line),"%c %s%s",i==dst.selected?'>':' ',dst.entries[i].is_directory?"[DIR] ":"",dst.entries[i].name);
-                text(scene,line,1025,325+(int)i*42,2,i==dst.selected?cyan:white);
+                text(scene,line,1025,325+(int)row*42,2,i==dst.selected?cyan:white);
             }
         } else text(scene,"NO WRITABLE HDD DIRECTORY FOUND",1025,330,2,muted);
         rect(scene,80,930,1760,80,20,33,52);
