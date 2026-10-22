@@ -17,7 +17,7 @@ A separate native target now exists in `ps4/`, with a controller-driven two-pane
 ## Build and console status
 The host-side core checks pass in GitHub Actions. This verifies portable file operations only; it does **not** prove PS4 compatibility. A successful OpenOrbis package build also does not prove it launches or copies files correctly on a real PS4.
 
-**There is not yet a finished installable file-manager PKG.** Remaining work: connect these modules to a PS4 controller/rendering UI, discover mounted USB and writable HDD locations at runtime, handle directory-copy UX and free-space errors, link with the pinned OpenOrbis toolchain, package the app, and test launch/copy behavior on the user's PS4 with HEN on firmware 13.02.
+**A first installable PKG has now been built successfully by GitHub Actions** from the native target. The latest build workflow is [here](https://github.com/sultanxan222222-sudo/Tim/actions/runs/39822781631); it uploaded the `TIM-PS4-File-Manager-PKG` artifact. This confirms compilation and package creation only. Remaining work is real-console validation: install it and test launch, USB/HDD mount detection, folder navigation, copy success/failure, and storage permissions on the user's PS4 with HEN on firmware 13.02. Do not treat CI success as proof that it runs correctly on the console.
 
 USB mount points and writable HDD locations vary. Do not hard-code an assumed `/user/app/PlayStation` destination. Let the user choose from directories that are actually mounted and writable. Keep copying separate from installing games.
 
