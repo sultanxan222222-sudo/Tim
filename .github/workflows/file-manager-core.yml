@@ -1,0 +1,25 @@
+name: File manager core checks
+
+on:
+  push:
+    paths:
+      - "file-manager/**"
+      - ".github/workflows/file-manager-core.yml"
+  pull_request:
+    paths:
+      - "file-manager/**"
+      - ".github/workflows/file-manager-core.yml"
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S file-manager -B build/file-manager -DCMAKE_BUILD_TYPE=Release
+      - name: Build with warnings as errors
+        run: cmake --build build/file-manager --parallel
+      - name: Run tests
+        run: ctest --test-dir build/file-manager --output-on-failure
