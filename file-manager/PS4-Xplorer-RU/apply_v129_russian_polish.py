@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safely polish the Russian strings in the complete PS4-Xplorer 1.29 source fork.
+"""Safely polish Russian strings in the complete PS4-Xplorer 1.29 source fork.
 
 This produces source edits only. It does not compile Unity or create a PS4 PKG.
 """
@@ -14,14 +14,12 @@ REPLACEMENTS = {
     "Controlador.cs": [
         ('CadenaNoHasCopiado = "Вы ничего не выбрали для копирования или вставки";',
          'CadenaNoHasCopiado = "Сначала скопируйте или вырежьте файл для вставки";'),
-        ('textoOptions.text = "OPTIONS\\\\nдля инструкций";',
-         'textoOptions.text = "OPTIONS\\\\nСправка";'),
+        (r'textoOptions.text = "OPTIONS\nдля инструкций";',
+         r'textoOptions.text = "OPTIONS\nСправка";'),
         ('CadenaErrorCrearCarpeta = "Папка которую вы пытаетесь создать уже существует";',
          'CadenaErrorCrearCarpeta = "Папка с таким именем уже существует";'),
         ('CadenaRwActivo = "Полные права доступа к системным папкам (только для продвинутых пользователей !)";',
          'CadenaRwActivo = "Полный доступ к чтению и записи системных папок (опасно)";'),
-        ('CadenaHomeSalvado = "Этот путь сохранен, как \\'\\'Домашний\\'\\' (Нажмите R3, чтобы вернуться сюда в любое время)";',
-         'CadenaHomeSalvado = "Путь сохранён как домашний. Нажмите R3, чтобы вернуться сюда";'),
         ('CadenaExtraer = "экстракт";',
          'CadenaExtraer = "Распаковать";'),
     ],
@@ -67,16 +65,16 @@ def plan(root):
         path = root / filename
         if not path.is_file():
             raise SystemExit(f"Не найден исходный файл: {path}")
-        text = read_text(path)
+        source = read_text(path)
         for old, new in pairs:
-            if old not in text:
-                if new in text:
+            if old not in source:
+                if new in source:
                     continue
                 raise SystemExit(f"Не найден ожидаемый русский текст в {filename}: {old}")
-            if text.count(old) != 1:
+            if source.count(old) != 1:
                 raise SystemExit(f"Ожидалось одно совпадение в {filename}: {old}")
-            text = text.replace(old, new, 1)
-        result[path] = text
+            source = source.replace(old, new, 1)
+        result[path] = source
     return result
 
 def main(argv=None):
