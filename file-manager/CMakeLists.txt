@@ -5,7 +5,7 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
-add_library(tim_file_ops file_ops.c)
+add_library(tim_file_ops file_ops.c file_browser.c)
 target_include_directories(tim_file_ops PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(CMAKE_C_COMPILER_ID MATCHES "GNU|Clang")
