@@ -1,0 +1,58 @@
+name: PS4-Xplorer RU upstream compatibility
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 4 * * 1"
+  push:
+    branches:
+      - ps4-xplorer-russian
+    paths:
+      - "file-manager/PS4-Xplorer-RU/**"
+      - ".github/workflows/ps4-xplorer-ru-upstream-check.yml"
+
+jobs:
+  patch-upstream:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out our patch repository
+        uses: actions/checkout@v4
+      - name: Check out upstream PS4-Xplorer source
+        uses: actions/checkout@v4
+        with:
+          repository: Lapy055/PS4-Xplorer
+          ref: master
+          path: file-manager/PS4-Xplorer-RU/PS4-Xplorer
+          persist-credentials: false
+      - name: Record upstream revision
+        shell: bash
+        run: |
+          git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer rev-parse HEAD | tee upstream-revision.txt
+          test -f file-manager/PS4-Xplorer-RU/PS4-Xplorer/ProjectSettings/ProjectVersion.txt
+      - name: Validate patch compatibility without writing
+        run: python file-manager/PS4-Xplorer-RU/apply_russian_patch.py --dry-run
+      - name: Apply patch to disposable checkout
+        run: python file-manager/PS4-Xplorer-RU/apply_russian_patch.py
+      - name: Validate changed source whitespace
+        run: git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer diff --check
+      - name: Export patch and test metadata
+        shell: bash
+        run: |
+          git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer diff --binary -- Assets/Codigos/Controlador.cs Assets/Codigos/Opciones.cs Assets/Codigos/OpcionesAvanzadas.cs > ps4-xplorer-ru.patch
+          {
+            echo "Upstream revision: $(cat upstream-revision.txt)"
+            echo "Unity editor version:"
+            cat file-manager/PS4-Xplorer-RU/PS4-Xplorer/ProjectSettings/ProjectVersion.txt
+            echo "Patch SHA-256:"
+            sha256sum ps4-xplorer-ru.patch
+            echo "Notice: this is a source patch only, not a compiled PS4 PKG."
+          } > patch-report.txt
+      - name: Upload source patch and report
+        uses: actions/upload-artifact@v4
+        with:
+          name: ps4-xplorer-ru-source-patch
+          path: |
+            ps4-xplorer-ru.patch
+            patch-report.txt
+          if-no-files-found: error
+          retention-days: 30
