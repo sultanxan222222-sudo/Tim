@@ -3,6 +3,14 @@
 
 #include "file_ops.h"
 
+#ifdef __cplusplus
+extern "C" {
+#ifdef __cplusplus
+}
+#endif
+
+#endif
+
 typedef struct tim_file_browser {
     char root[TIM_PATH_MAX];
     char current[TIM_PATH_MAX];
