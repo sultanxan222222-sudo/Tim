@@ -34,7 +34,7 @@ jobs:
       - name: Apply patch to disposable checkout
         run: python file-manager/PS4-Xplorer-RU/apply_russian_patch.py
       - name: Validate changed source whitespace
-        run: git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer diff --check
+        run: git -C file-manager/PS4-Xplorer-RU/PS4-Xplorer -c core.whitespace=cr-at-eol diff --check
       - name: Export patch and test metadata
         shell: bash
         run: |
