@@ -25,7 +25,7 @@ static char *tim_strdup(const char *s) {
 int tim_copy_regular_file(const char *source, const char *destination,
                           tim_copy_progress_fn progress, void *userdata) {
     struct stat st;
-    int in_fd = -1, out_fd = -1, saved_errno = 0;
+    int in_fd = -1, out_fd = -1, saved_errno = 0, destination_created = 0;
     unsigned char *buffer = NULL;
     uint64_t copied = 0, total;
     int result = -1;
@@ -42,6 +42,7 @@ int tim_copy_regular_file(const char *source, const char *destination,
     if (in_fd < 0) goto done;
     out_fd = open(destination, O_WRONLY | O_CREAT | O_EXCL, st.st_mode & 0777);
     if (out_fd < 0) goto done;
+    destination_created = 1;
 
     buffer = (unsigned char *)malloc(TIM_COPY_BUFFER_SIZE);
     if (!buffer) goto done;
@@ -85,7 +86,7 @@ done:
         }
     }
     /* Remove an incomplete destination after a failed copy. */
-    if (result != 0 && destination) unlink(destination);
+    if (result != 0 && destination_created) unlink(destination);
     errno = saved_errno;
     return result;
 }
