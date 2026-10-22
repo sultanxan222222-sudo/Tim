@@ -9,6 +9,26 @@ public class OpcionesAvanzadas : MonoBehaviour {
 
     public GameObject[] MisOpciones = new GameObject[2];
 
+    public void Awake()
+    {
+        if (Application.systemLanguage != SystemLanguage.Russian || MisOpciones == null)
+            return;
+
+        if (MisOpciones.Length > 0 && MisOpciones[0] != null)
+        {
+            var label = MisOpciones[0].GetComponentInChildren<UnityEngine.UI.Text>();
+            if (label != null)
+                label.text = "FTP-сервер";
+        }
+
+        if (MisOpciones.Length > 1 && MisOpciones[1] != null)
+        {
+            var label = MisOpciones[1].GetComponentInChildren<UnityEngine.UI.Text>();
+            if (label != null)
+                label.text = "Полный доступ (чтение/запись)";
+        }
+    }
+
     public void OnDisable()
     {
         Opcion = 0;
