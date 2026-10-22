@@ -1,18 +1,31 @@
-# PS4-Xplorer Russian adaptation (work in progress)
+# PS4-Xplorer RU — русская адаптация
 
-This folder tracks our Russian-language adaptation work based on the upstream PS4-Xplorer project by Lapy.
+Основа: существующий файловый менеджер PS4-Xplorer от Lapy. Исходный проект не переписываем с нуля.
 
-## Base selection
-- Use the latest available PS4-Xplorer 2.08 package/source, not the older 2.07 listing.
-- Upstream release notes report support through firmware 13.52 (published 2026-09-22).
-- Upstream source repository: https://github.com/Lapy055/PS4-Xplorer
-- Upstream release/package information: https://pkg-zone.com/details/LAPY20009
+## Репозиторий и ссылки
+- Исходный проект: https://github.com/Lapy055/PS4-Xplorer
+- Страница пакета/релизов: https://pkg-zone.com/details/LAPY20009
+- Наша рабочая ветка: https://github.com/sultanxan222222-sudo/Tim/tree/ps4-xplorer-russian
 
-## Our intended additions
-1. Russian UI text throughout the application.
-2. Clear Russian labels for file operations, advanced options, warnings, and help.
-3. Preserve existing file-management behavior and firmware compatibility.
-4. Integrate only after source/build compatibility is verified; do not claim a working PKG until it has been built and tested.
+## Что уже сделано в этой ветке
+- Добавлены русские строки в Controller.cs для операций копирования/перемещения, предупреждений и подсказки.
+- Добавлены русские подписи основных операций в Opciones.cs.
+- Добавлен перевод двух пунктов расширенного меню: FTP-сервер и полный доступ на чтение/запись.
+- Добавлен словарь ru-RU.json с терминологией интерфейса.
+- Добавлен скрипт начального патча для отдельной копии исходного Unity-проекта.
+- Добавлены статические проверки локализации и GitHub Actions workflow.
+- Добавлены инструкции по сборке и ручной регрессионный тест-план.
 
-## Important limitation
-The public GitHub source tree is not demonstrably the exact source used for the latest 2.08 binary, and the repository does not include a documented, ready-to-edit Russian .xlang file format. A translation patch must be validated against the actual source/project version before packaging. This branch is a work area, not a finished installable PKG.
+## Честный статус
+**Это ещё не завершённый проект и не установочный PKG.** В ветке находятся выбранные исходные скрипты, но не полный Unity-проект со сценами, префабами, ресурсами и зависимостями. Статическая проверка не компилирует приложение и не подтверждает запуск на PS4.
+
+Для завершения необходимы точный полный Unity-проект совместимой версии, проверка лицензии исходников, доступная среда сборки PS4, успешная компиляция, сборка PKG и реальный тест на целевой консоли. Не следует считать пакет готовым, пока эти шаги не подтверждены.
+
+## Быстрый статический тест
+Запустить из корня репозитория:
+```sh
+python file-manager/PS4-Xplorer-RU/tests/check_localization.py
+```
+Тест проверяет наличие ожидаемых русских строк и JSON. Он не заменяет Unity-сборку или тест на консоли.
+
+Подробности: [BUILD-AND-TEST-RU.md](BUILD-AND-TEST-RU.md) и [TEST-PLAN-RU.md](TEST-PLAN-RU.md).
