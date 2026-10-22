@@ -113,12 +113,13 @@ int tim_fm_copy_selected(const tim_file_browser *browser,
     struct stat st;
     if (!browser || !destination_directory || !destination_directory[0] ||
         browser->selected >= browser->count) { errno = EINVAL; return -1; }
-    if (browser->entries[browser->selected].is_directory) { errno = EISDIR; return -1; }
     if (join_path(source, sizeof(source), browser->current,
                   browser->entries[browser->selected].name) != 0) return -1;
     if (join_path(destination, sizeof(destination), destination_directory,
                   browser->entries[browser->selected].name) != 0) return -1;
     if (stat(destination_directory, &st) != 0) return -1;
     if (!S_ISDIR(st.st_mode)) { errno = ENOTDIR; return -1; }
+    if (browser->entries[browser->selected].is_directory)
+        return tim_copy_directory(source, destination, progress, userdata);
     return tim_copy_regular_file(source, destination, progress, userdata);
 }
