@@ -6,8 +6,8 @@ This is the native file-manager track alongside the existing web catalog. The we
 Browse a USB drive that the console has mounted and copy files to a user-selected writable location on the PS4 HDD. Copying a PKG file does **not** install the game.
 
 ## Implemented source modules
-- `file_ops.c/.h`: lists regular files and directories; copies regular files in chunks, reports progress, refuses to overwrite, and removes a partial destination if a copy fails.
-- `file_browser.c/.h`: rooted directory navigation, selection, entering folders, parent navigation that cannot escape the selected root, and copying a selected file into a chosen destination directory.
+- `file_ops.c/.h`: lists regular files and directories; copies regular files in chunks, reports progress, refuses to overwrite, removes a partial file if a copy fails, and recursively copies folders without overwriting existing destinations. A failed folder copy may leave already-copied children in place.
+- `file_browser.c/.h`: rooted directory navigation, selection, entering folders, parent navigation that cannot escape the selected root, and copying a selected file or directory into a chosen destination directory.
 - `tests/test_file_ops.c`: host tests for copying, no-overwrite behavior, cancellation cleanup, directory listing, rooted navigation, and browser copy flow.
 - `CMakeLists.txt` and `.github/workflows/file-manager-core.yml`: compile with strict warnings and run the host-side tests automatically.
 
