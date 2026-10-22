@@ -1,0 +1,31 @@
+{
+  "project": "PS4-Xplorer RU",
+  "kind": "partial-source-localization",
+  "upstream_repository": "https://github.com/Lapy055/PS4-Xplorer",
+  "upstream_branch": "master",
+  "reviewed_upstream_commit": "98a603834e598ab7907015c2f935aadc42942508",
+  "unity_editor_version": "2017.2.0p2",
+  "changed_source_files": [
+    "Assets/Codigos/Controlador.cs",
+    "Assets/Codigos/Opciones.cs",
+    "Assets/Codigos/OpcionesAvanzadas.cs"
+  ],
+  "features_included": [
+    "partial_russian_ui",
+    "safe_preflight_patcher",
+    "dry_run_mode",
+    "atomic_source_writes",
+    "source_line_ending_preservation",
+    "automated_static_tests",
+    "upstream_compatibility_workflow"
+  ],
+  "not_included": [
+    "full_unity_project_in_this_repository",
+    "compiled_ps4_pkg",
+    "ps4_sdk",
+    "runtime_test_on_console",
+    "full_ui_translation",
+    "usb_copy_safety_changes"
+  ],
+  "release_status": "not_ready_for_installation"
+}
