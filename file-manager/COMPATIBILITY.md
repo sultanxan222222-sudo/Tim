@@ -1,9 +1,9 @@
 # PS4 firmware compatibility target
 
-The user reports their console firmware as **17.02.31** and uses HEN.
+The user confirms the console firmware is **13.02** and uses HEN.
 
 ## Compatibility policy
-- Treat 17.02.31 as the target environment for design and testing.
+- Treat firmware 13.02 as the target environment for design and testing.
 - Do not claim compatibility merely because the source compiles.
 - Before calling a PKG installable, verify the OpenOrbis SDK/toolchain and package metadata against this firmware and test on the actual console/HEN environment where possible.
 - Use only mount points and writable directories discovered at runtime; do not assume an internal HDD path is writable.
