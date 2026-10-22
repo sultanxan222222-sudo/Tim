@@ -67,7 +67,8 @@ int main(void) {
     CHECK(snprintf(tree_file, sizeof(tree_file), "%s/tree/sub/nested.txt", temp) > 0);
     CHECK(snprintf(tree_copy, sizeof(tree_copy), "%s/tree-copy", temp) > 0);
     CHECK(snprintf(tree_copy_sub, sizeof(tree_copy_sub), "%s/tree-copy/sub", temp) > 0);
-    CHECK(snprintf(tree_copy_file, sizeof(tree_copy_file), "%s/tree-copy/sub/nested.txt", temp) > 0);\n    CHECK(snprintf(tree_inside, sizeof(tree_inside), "%s/tree/inside", temp) > 0);
+    CHECK(snprintf(tree_copy_file, sizeof(tree_copy_file), "%s/tree-copy/sub/nested.txt", temp) > 0);
+    CHECK(snprintf(tree_inside, sizeof(tree_inside), "%s/tree/inside", temp) > 0);
     CHECK(mkdir(folder, 0700) == 0);
     CHECK(mkdir(tree, 0700) == 0);
     CHECK(mkdir(tree_sub, 0700) == 0);
