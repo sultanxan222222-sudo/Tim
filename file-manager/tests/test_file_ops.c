@@ -50,7 +50,7 @@ static int file_equals(const char *path, const char *expected) {
 int main(void) {
     char temp[] = "/tmp/tim-file-ops-XXXXXX";
     char source[256], destination[256], existing[256], cancelled[256], folder[256];
-    char tree[256], tree_sub[256], tree_file[256], tree_copy[256], tree_copy_sub[256], tree_copy_file[256];
+    char tree[256], tree_sub[256], tree_file[256], tree_copy[256], tree_copy_sub[256], tree_copy_file[256], tree_inside[256];
     tim_dir_entry *entries = NULL;
     tim_file_browser browser;
     size_t count = 0, i;
@@ -67,7 +67,7 @@ int main(void) {
     CHECK(snprintf(tree_file, sizeof(tree_file), "%s/tree/sub/nested.txt", temp) > 0);
     CHECK(snprintf(tree_copy, sizeof(tree_copy), "%s/tree-copy", temp) > 0);
     CHECK(snprintf(tree_copy_sub, sizeof(tree_copy_sub), "%s/tree-copy/sub", temp) > 0);
-    CHECK(snprintf(tree_copy_file, sizeof(tree_copy_file), "%s/tree-copy/sub/nested.txt", temp) > 0);
+    CHECK(snprintf(tree_copy_file, sizeof(tree_copy_file), "%s/tree-copy/sub/nested.txt", temp) > 0);\n    CHECK(snprintf(tree_inside, sizeof(tree_inside), "%s/tree/inside", temp) > 0);
     CHECK(mkdir(folder, 0700) == 0);
     CHECK(mkdir(tree, 0700) == 0);
     CHECK(mkdir(tree_sub, 0700) == 0);
@@ -95,7 +95,7 @@ int main(void) {
     CHECK(found_file && found_folder);
     tim_free_directory(entries, count);
 
-    CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == 0);
+    CHECK(tim_copy_directory(tree, tree_inside, NULL, NULL) == -1); /* reject destination inside source */\n    CHECK(access(tree_inside, F_OK) != 0);\n    CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == 0);
     CHECK(file_equals(tree_copy_file, "nested directory payload"));
     CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == -1); /* no overwrite */
 
