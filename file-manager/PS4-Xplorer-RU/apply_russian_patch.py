@@ -15,7 +15,7 @@ CONTROLADOR_CASE = '''            case SystemLanguage.Russian:
                 CadenaCopiando = "Копирование...";
                 CadenaNoHasCopiado = "Сначала скопируйте или вырежьте файл для вставки";
                 CadenaErrorCrearCarpeta = "Папка с таким именем уже существует";
-                textoOptions.text = "OPTIONS\\nсправка";
+                textoOptions.text = "OPTIONS\nСправка";
                 break;
 '''
 
