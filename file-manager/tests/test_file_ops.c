@@ -50,6 +50,7 @@ static int file_equals(const char *path, const char *expected) {
 int main(void) {
     char temp[] = "/tmp/tim-file-ops-XXXXXX";
     char source[256], destination[256], existing[256], cancelled[256], folder[256];
+    char tree[256], tree_sub[256], tree_file[256], tree_copy[256], tree_copy_sub[256], tree_copy_file[256];
     tim_dir_entry *entries = NULL;
     tim_file_browser browser;
     size_t count = 0, i;
@@ -61,7 +62,16 @@ int main(void) {
     CHECK(snprintf(existing, sizeof(existing), "%s/existing.txt", temp) > 0);
     CHECK(snprintf(cancelled, sizeof(cancelled), "%s/cancelled.txt", temp) > 0);
     CHECK(snprintf(folder, sizeof(folder), "%s/subfolder", temp) > 0);
+    CHECK(snprintf(tree, sizeof(tree), "%s/tree", temp) > 0);
+    CHECK(snprintf(tree_sub, sizeof(tree_sub), "%s/tree/sub", temp) > 0);
+    CHECK(snprintf(tree_file, sizeof(tree_file), "%s/tree/sub/nested.txt", temp) > 0);
+    CHECK(snprintf(tree_copy, sizeof(tree_copy), "%s/tree-copy", temp) > 0);
+    CHECK(snprintf(tree_copy_sub, sizeof(tree_copy_sub), "%s/tree-copy/sub", temp) > 0);
+    CHECK(snprintf(tree_copy_file, sizeof(tree_copy_file), "%s/tree-copy/sub/nested.txt", temp) > 0);
     CHECK(mkdir(folder, 0700) == 0);
+    CHECK(mkdir(tree, 0700) == 0);
+    CHECK(mkdir(tree_sub, 0700) == 0);
+    CHECK(write_text(tree_file, "nested directory payload") == 0);
     CHECK(write_text(source, "PS4 file manager test payload") == 0);
 
     CHECK(tim_copy_regular_file(source, destination, progress_ok, &calls) == 0);
@@ -85,6 +95,10 @@ int main(void) {
     CHECK(found_file && found_folder);
     tim_free_directory(entries, count);
 
+    CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == 0);
+    CHECK(file_equals(tree_copy_file, "nested directory payload"));
+    CHECK(tim_copy_directory(tree, tree_copy, NULL, NULL) == -1); /* no overwrite */
+
     CHECK(tim_fm_open(&browser, temp) == 0);
     CHECK(tim_fm_parent(&browser) == 0); /* root cannot be escaped */
     for (i = 0; i < browser.count; ++i) {
@@ -101,6 +115,12 @@ int main(void) {
     }
     tim_fm_close(&browser);
 
+    CHECK(unlink(tree_copy_file) == 0);
+    CHECK(rmdir(tree_copy_sub) == 0);
+    CHECK(rmdir(tree_copy) == 0);
+    CHECK(unlink(tree_file) == 0);
+    CHECK(rmdir(tree_sub) == 0);
+    CHECK(rmdir(tree) == 0);
     CHECK(unlink(source) == 0);
     CHECK(unlink(destination) == 0);
     CHECK(unlink(existing) == 0);
