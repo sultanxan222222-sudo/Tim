@@ -45,9 +45,10 @@ static void text(Scene2D *s, const char *v, int x, int y, int scale, Color color
         const uint8_t *g=0;
         if(ch>='A'&&ch<='Z') g=FONT[ch-'A'];
         else if(ch>='0'&&ch<='9') g=FONT[26+ch-'0'];
-        if(g) for(int cx=0;cx<5;cx++) for(int cy=0;cy<7;cy++)
-            if((g[cx]>>cy)&1) s->DrawRectangle(x+cx*scale,y+cy*scale,scale,scale,color);
-        else if(ch=='.') s->DrawRectangle(x,y+6*scale,scale,scale,color);
+        if(g) {
+            for(int cx=0;cx<5;cx++) for(int cy=0;cy<7;cy++)
+                if((g[cx]>>cy)&1) s->DrawRectangle(x+cx*scale,y+cy*scale,scale,scale,color);
+        } else if(ch=='.') s->DrawRectangle(x,y+6*scale,scale,scale,color);
         else if(ch=='/') s->DrawRectangle(x+2*scale,y,scale,7*scale,color);
         else if(ch=='-') s->DrawRectangle(x,y+3*scale,4*scale,scale,color);
         else if(ch=='_') s->DrawRectangle(x,y+6*scale,4*scale,scale,color);
