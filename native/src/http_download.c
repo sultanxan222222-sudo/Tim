@@ -6,9 +6,9 @@
    unprototyped void stubs. Declare the documented ABI here so return codes
    and arguments are type-checked against the actual runtime API. */
 extern int32_t sceNetInit(void);
-extern int32_t sceNetTerm(void);
+extern void sceNetTerm(void);
 extern int32_t sceNetPoolCreate(const char *name, int32_t size, int32_t flags);
-extern int32_t sceNetPoolDestroy(int32_t poolId);
+extern void sceNetPoolDestroy(int32_t poolId);
 extern int32_t sceSslInit(size_t poolSize);
 extern int32_t sceSslTerm(int32_t sslCtxId);
 extern int32_t sceHttpInit(int32_t memId, int32_t sslId, size_t poolSize);
@@ -27,6 +27,11 @@ extern int32_t sceHttpGetStatusCode(int32_t reqId, int32_t *statusCode);
 extern int32_t sceHttpGetResponseContentLength(int32_t reqId, int32_t *result,
                                                 size_t *contentLength);
 extern int32_t sceHttpReadData(int32_t reqId, void *data, uint32_t size);
+extern int32_t sceHttpSetAutoRedirect(int32_t id, int32_t isEnable);
+extern int32_t sceHttpSetConnectTimeOut(int32_t id, uint32_t usec);
+extern int32_t sceHttpSetResolveTimeOut(int32_t id, uint32_t usec);
+extern int32_t sceHttpSetSendTimeOut(int32_t id, uint32_t usec);
+extern int32_t sceHttpSetRecvTimeOut(int32_t id, uint32_t usec);
 
 
 
@@ -50,6 +55,11 @@ extern void sceNetCtlTerm(void);
 #define TIM_HTTP_POOL_SIZE (2U * 1024U * 1024U)
 #define TIM_HTTP_DEFAULT_CHUNK (32U * 1024U)
 #define TIM_HTTP_MAX_CHUNK (64U * 1024U)
+/* All sceHttp timeout values are expressed in microseconds. */
+#define TIM_HTTP_RESOLVE_TIMEOUT_USEC (15U * 1000U * 1000U)
+#define TIM_HTTP_CONNECT_TIMEOUT_USEC (20U * 1000U * 1000U)
+#define TIM_HTTP_SEND_TIMEOUT_USEC (30U * 1000U * 1000U)
+#define TIM_HTTP_RECV_TIMEOUT_USEC (30U * 1000U * 1000U)
 
 static int g_net_ready = 0;
 static int g_netctl_ready = 0;
@@ -76,11 +86,16 @@ static void close_request(TimHttpDownload *d) {
     }
 }
 
-static void close_output(TimHttpDownload *d) {
+static int close_output(TimHttpDownload *d) {
+    int rc = 0;
     if (d != NULL && d->output_file != NULL) {
-        fclose(d->output_file);
+        FILE *file = d->output_file;
         d->output_file = NULL;
+        /* fclose also flushes buffered writes. Its result must be checked
+           before atomically publishing the final filename. */
+        if (fclose(file) != 0) rc = -1;
     }
+    return rc;
 }
 
 int tim_http_download_system_init(void) {
@@ -112,8 +127,17 @@ int tim_http_download_system_init(void) {
     if (g_http_context < 0) goto fail;
 
     g_http_template = sceHttpCreateTemplate(g_http_context,
-        "TIM-PS4-Downloader/0.1", TIM_ORBIS_HTTP_VERSION_1_1, 0);
+        "TIM-PS4-Downloader/0.2", TIM_ORBIS_HTTP_VERSION_1_1, 0);
     if (g_http_template < 0) goto fail;
+
+    /* Many ordinary download hosts redirect from short links/CDNs. Enable
+       the SDK redirect handler and bound each network phase so a dead host
+       does not leave the user staring at a frozen screen indefinitely. */
+    (void)sceHttpSetAutoRedirect(g_http_template, 1);
+    (void)sceHttpSetResolveTimeOut(g_http_template, TIM_HTTP_RESOLVE_TIMEOUT_USEC);
+    (void)sceHttpSetConnectTimeOut(g_http_template, TIM_HTTP_CONNECT_TIMEOUT_USEC);
+    (void)sceHttpSetSendTimeOut(g_http_template, TIM_HTTP_SEND_TIMEOUT_USEC);
+    (void)sceHttpSetRecvTimeOut(g_http_template, TIM_HTTP_RECV_TIMEOUT_USEC);
     return 0;
 
 fail:
@@ -126,12 +150,19 @@ int tim_http_download_start(TimHttpDownload *d, const char *url,
     int rc, length_result = TIM_ORBIS_HTTP_CONTENTLEN_NOT_FOUND;
     size_t content_length = 0;
     int status = 0;
-    if (d == NULL || !tim_http_url_is_valid(url) || destination == NULL ||
-        destination[0] != '/' || strlen(destination) >= sizeof(d->destination))
-        return -1;
+    if (d == NULL) return -1;
     memset(d, 0, sizeof(*d));
     d->connection_id = -1;
     d->request_id = -1;
+    if (!tim_http_url_is_valid(url)) {
+        set_error(d, "Invalid URL; enter an absolute HTTP(S) URL");
+        return -1;
+    }
+    if (destination == NULL || destination[0] != '/' ||
+        strlen(destination) >= sizeof(d->destination)) {
+        set_error(d, "Invalid destination path");
+        return -1;
+    }
     d->state = TIM_HTTP_CONNECTING;
     snprintf(d->url, sizeof(d->url), "%s", url);
     snprintf(d->destination, sizeof(d->destination), "%s", destination);
@@ -151,6 +182,7 @@ int tim_http_download_start(TimHttpDownload *d, const char *url,
         close_request(d);
         return -1;
     }
+    (void)sceHttpSetConnectTimeOut(d->connection_id, TIM_HTTP_CONNECT_TIMEOUT_USEC);
     d->request_id = sceHttpCreateRequestWithURL(d->connection_id,
         TIM_ORBIS_METHOD_GET, d->url, 0);
     if (d->request_id < 0) {
@@ -158,6 +190,8 @@ int tim_http_download_start(TimHttpDownload *d, const char *url,
         close_request(d);
         return -1;
     }
+    (void)sceHttpSetSendTimeOut(d->request_id, TIM_HTTP_SEND_TIMEOUT_USEC);
+    (void)sceHttpSetRecvTimeOut(d->request_id, TIM_HTTP_RECV_TIMEOUT_USEC);
     rc = sceHttpSendRequest(d->request_id, NULL, 0);
     if (rc < 0) {
         set_error(d, "HTTP request failed; check network and URL");
@@ -208,7 +242,11 @@ int tim_http_download_step(TimHttpDownload *d, size_t max_bytes) {
         return -1;
     }
     if (bytes_read == 0) {
-        close_output(d);
+        if (close_output(d) != 0) {
+            close_request(d);
+            set_error(d, "Disk flush failed; partial file retained as .part");
+            return -1;
+        }
         close_request(d);
         if (d->total_bytes != 0 && d->received_bytes != d->total_bytes) {
             set_error(d, "Download ended before the expected file size");

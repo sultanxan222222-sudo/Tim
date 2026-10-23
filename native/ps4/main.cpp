@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <wchar.h>
 #include <sys/stat.h>
 #include <orbis/Pad.h>
@@ -62,6 +63,8 @@ static const uint8_t FONT[][5] = {
     {0x3c,0x4a,0x49,0x49,0x30},{0x01,0x71,0x09,0x05,0x03},
     {0x36,0x49,0x49,0x49,0x36},{0x06,0x49,0x49,0x29,0x1e}
 };
+static int g_common_dialog_ready = 0;
+
 static Color rgb(uint8_t r,uint8_t g,uint8_t b){ Color c={r,g,b}; return c; }
 static void rect(Scene2D*s,int x,int y,int w,int h,uint8_t r,uint8_t g,uint8_t b){
     s->DrawRectangle(x,y,w,h,rgb(r,g,b));
@@ -91,7 +94,7 @@ static int open_url_dialog(wchar_t *buffer, size_t capacity){
     OrbisImeDialogSetting setting;
     if(buffer == NULL || capacity < 2) return -1;
     memset(buffer, 0, capacity * sizeof(wchar_t));
-    (void)sceCommonDialogInitialize();
+    if (!g_common_dialog_ready) return -1;
     memset(&setting, 0, sizeof(setting));
     setting.userId = 0;
     setting.type = ORBIS_TYPE_TYPE_URL;
@@ -104,10 +107,14 @@ static int open_url_dialog(wchar_t *buffer, size_t capacity){
     return sceImeDialogInit(&setting, NULL);
 }
 
-static int finish_url_dialog(wchar_t *buffer, char *out, size_t outSize){
+static int finish_url_dialog(wchar_t *buffer, size_t bufferCapacity,
+                             char *out, size_t outSize){
     OrbisDialogResult result;
     OrbisDialogStatus status = sceImeDialogGetStatus();
     size_t i;
+    if (buffer == NULL || bufferCapacity == 0 || out == NULL || outSize == 0)
+        return -1;
+    out[0] = '\0';
     if(status == ORBIS_DIALOG_STATUS_RUNNING || status == ORBIS_DIALOG_STATUS_NONE)
         return 0;
     memset(&result, 0, sizeof(result));
@@ -117,11 +124,12 @@ static int finish_url_dialog(wchar_t *buffer, char *out, size_t outSize){
     }
     sceImeDialogTerm();
     if(result.endstatus != ORBIS_DIALOG_OK) return -1;
-    if(outSize == 0) return -1;
-    for(i = 0; buffer[i] != 0 && i + 1 < outSize; ++i){
+    for(i = 0; i < bufferCapacity && buffer[i] != 0; ++i){
+        if(i + 1 >= outSize) return -1;
         if(buffer[i] < 0x21 || buffer[i] > 0x7e) return -1;
         out[i] = (char)buffer[i];
     }
+    if(i == bufferCapacity) return -1;
     out[i] = '\0';
     return i > 0 ? 1 : -1;
 }
@@ -158,13 +166,29 @@ static void url_filename(const char *url, char *filename, size_t capacity){
     if(filename[0] == '\0') snprintf(filename, capacity, "download.pkg");
 }
 
+static int ensure_directory(const char *path){
+    struct stat info;
+    if (mkdir(path, 0755) == 0) return 1;
+    if (errno != EEXIST) return 0;
+    return stat(path, &info) == 0 && S_ISDIR(info.st_mode);
+}
+
 static int begin_download(TimHttpDownload *download, const char *url,
                           char *message, size_t messageSize){
     char filename[96], destination[1024];
-    (void)mkdir("/data/Tim", 0777);
-    (void)mkdir("/data/Tim/downloads", 0777);
+    if (download == NULL || message == NULL || messageSize == 0) return -1;
+    if (download->state == TIM_HTTP_DOWNLOADING ||
+        download->state == TIM_HTTP_CONNECTING) {
+        snprintf(message, messageSize, "A DOWNLOAD IS ALREADY ACTIVE");
+        return -1;
+    }
     if(!tim_http_url_is_valid(url)){
         snprintf(message, messageSize, "INVALID URL: USE HTTP OR HTTPS");
+        return -1;
+    }
+    if (!ensure_directory("/data/Tim") ||
+        !ensure_directory("/data/Tim/downloads")) {
+        snprintf(message, messageSize, "CANNOT CREATE /DATA/TIM/DOWNLOADS");
         return -1;
     }
     url_filename(url, filename, sizeof(filename));
@@ -173,9 +197,6 @@ static int begin_download(TimHttpDownload *download, const char *url,
         snprintf(message, messageSize, "DESTINATION PATH TOO LONG");
         return -1;
     }
-    memset(download, 0, sizeof(*download));
-    download->connection_id = -1;
-    download->request_id = -1;
     if(tim_http_download_start(download, url, destination) != 0){
         snprintf(message, messageSize, "%s",
                  download->error[0] ? download->error : "DOWNLOAD START FAILED");
@@ -200,8 +221,12 @@ int main(){
     setvbuf(stdout,NULL,_IONBF,0);
     scePadInit();
     int pad=scePadOpen(0,ORBIS_PAD_PORT_TYPE_STANDARD,0,NULL);
+    g_common_dialog_ready = (sceCommonDialogInitialize() >= 0);
     Scene2D*scene=new Scene2D(1920,1080,4);
-    if(!scene->Init(0x1200000,2))return 1;
+    if(!scene->Init(0x1200000,2)){
+        delete scene;
+        return 1;
+    }
     scene->SetActiveFrameBuffer(0);
     const Color white=rgb(235,242,255),muted=rgb(135,157,183),cyan=rgb(50,220,220);
     int frame=0,selected=0,tab=0,previous=0,dialogOpen=0;
@@ -209,6 +234,8 @@ int main(){
     download.connection_id=-1; download.request_id=-1;
     wchar_t urlInput[2048]; char urlAscii[2048];
     char statusMessage[256]="READY - SELECT ENTER PKG URL";
+    if (!g_common_dialog_ready)
+        snprintf(statusMessage,sizeof(statusMessage),"SYSTEM URL KEYBOARD UNAVAILABLE");
     const char*games[]={"ROCKET LEAGUE","BRAWLHALLA","ENTER PKG URL"};
     const char*types[]={"NO VERIFIED URL","NO VERIFIED URL","HTTP OR HTTPS"};
     for(;;){
@@ -239,7 +266,8 @@ int main(){
         previous=buttons;
 
         if(dialogOpen){
-            int dialogResult=finish_url_dialog(urlInput,urlAscii,sizeof(urlAscii));
+            int dialogResult=finish_url_dialog(urlInput,
+                sizeof(urlInput)/sizeof(urlInput[0]),urlAscii,sizeof(urlAscii));
             if(dialogResult!=0){
                 dialogOpen=0;
                 if(dialogResult>0) (void)begin_download(&download,urlAscii,statusMessage,sizeof(statusMessage));
@@ -253,12 +281,13 @@ int main(){
                 download.error[0]?download.error:"DOWNLOAD FAILED");
         }
 
-        scene->FrameBufferClear();
-        rect(scene,0,0,1920,1080,8,14,25); rect(scene,0,0,1920,10,50,220,220);
+        /* Fill the frame once; avoid clearing to white and repainting it dark. */
+        rect(scene,0,0,1920,1080,8,14,25);
+        rect(scene,0,0,1920,10,50,220,220);
         rect(scene,100,70,1720,130,20,33,52);
         txt(scene,"TIM",135,100,8,cyan); txt(scene,"PS4 GAME LIBRARY",390,100,4,white);
         txt(scene,"CATALOG",140,240,3,tab==0?cyan:muted);
-        txt(scene,"DOWNLOAD QUEUE",410,240,3,tab==1?cyan:muted);
+        txt(scene,"DOWNLOADS",410,240,3,tab==1?cyan:muted);
         rect(scene,120,290,1680,3,40,70,92);
         if(tab==0){
             card(scene,120,335,520,300,games[0],types[0],selected==0);

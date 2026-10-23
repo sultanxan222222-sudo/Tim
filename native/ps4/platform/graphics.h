@@ -38,6 +38,8 @@ class Scene2D
 	char **frameBuffers;
 	OrbisKernelEqueue flipQueue;
 	OrbisVideoOutBufferAttribute attr;
+	bool flipQueueReady;
+	bool buffersRegistered;
 	
 	int frameBufferSize;
 	int frameBufferCount;
