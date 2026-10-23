@@ -5,6 +5,7 @@
 #include <wchar.h>
 #include <sys/stat.h>
 #include <orbis/Pad.h>
+#include <orbis/UserService.h>
 #include <orbis/CommonDialog.h>
 #include "graphics.h"
 #include "../src/http_download.h"
@@ -219,8 +220,18 @@ static const char *download_state_text(const TimHttpDownload *d){
 }
 int main(){
     setvbuf(stdout,NULL,_IONBF,0);
-    scePadInit();
-    int pad=scePadOpen(0,ORBIS_PAD_PORT_TYPE_STANDARD,0,NULL);
+    /* Open a pad for the actual logged-in user; hard-coded user ID 0 can fail. */
+    int userId = -1;
+    (void)sceUserServiceInitialize(NULL);
+    if (sceUserServiceGetInitialUser(&userId) < 0 || userId < 0)
+        (void)sceUserServiceGetForegroundUser(&userId);
+    (void)scePadInit();
+    int pad = -1;
+    if (userId >= 0) {
+        pad = scePadOpen(userId, ORBIS_PAD_PORT_TYPE_STANDARD, 0, NULL);
+        if (pad < 0)
+            pad = scePadGetHandle(userId, ORBIS_PAD_PORT_TYPE_STANDARD, 0);
+    }
     /* OpenOrbis exposes this initializer as void; IME init reports failure. */
     sceCommonDialogInitialize();
     g_common_dialog_ready = 1;
