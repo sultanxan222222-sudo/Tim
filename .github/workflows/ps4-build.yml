@@ -6,6 +6,10 @@ on:
     paths:
       - "native/ps4/**"
       - ".github/workflows/ps4-build.yml"
+  pull_request:
+    paths:
+      - "native/ps4/**"
+      - ".github/workflows/ps4-build.yml"
   workflow_dispatch:
 
 permissions:
