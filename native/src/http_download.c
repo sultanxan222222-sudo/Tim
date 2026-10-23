@@ -1,6 +1,7 @@
 #include "http_download.h"
 #include "http_url.h"
 
+#include <stdbool.h>
 #include <orbis/Http.h>
 #include <orbis/Ssl.h>
 #include <orbis/Net.h>
@@ -8,7 +9,6 @@
 #include <orbis/_types/http.h>
 
 #include <stdio.h>
-#include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
