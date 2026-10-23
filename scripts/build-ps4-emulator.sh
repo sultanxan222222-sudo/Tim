@@ -115,14 +115,26 @@ elif git -C "$FLYCAST_SRC" apply --check "$PATCH" >/dev/null 2>&1; then
 else
     fail "Resonance PS4 patch does not apply cleanly to pinned Flycast $BASE. Use a clean build tree."
 fi
+SETTINGS_MENU="$FLYCAST_SRC/shell/ps4/launcher/settings_menu.cpp"
+# A renderer-only overlay is not a complete integration. Re-apply the idempotent
+# integration script if either visible control is missing from the actual PS4 menu.
 if ! grep -q 'whatsNextBridge.begin_real_frame' "$FLYCAST_SRC/core/rend/vulkan/vulkan_context.cpp" ||
-   ! grep -q 'Mini-DLSS spatial finishing pass' "$FLYCAST_SRC/core/rend/vulkan/frame_gen.cpp"; then
+   ! grep -q 'whatsNextBridge.commit_real_frame' "$FLYCAST_SRC/core/rend/vulkan/vulkan_context.cpp" ||
+   ! grep -q 'Mini-DLSS spatial finishing pass' "$FLYCAST_SRC/core/rend/vulkan/frame_gen.cpp" ||
+   ! grep -Fq "WHAT'S NEXT / Frame Generation" "$SETTINGS_MENU" ||
+   ! grep -Fq "Mini-DLSS / Spatial Reconstruction" "$SETTINGS_MENU" ||
+   ! grep -q 'config::FrameGeneration' "$SETTINGS_MENU" ||
+   ! grep -q 'config::MiniDLSS' "$SETTINGS_MENU"; then
     bash "$ROOT/scripts/apply-resonance-whats-next.sh" "$FLYCAST_SRC"
 else
-    echo "WHAT'S NEXT overlay already present."
+    echo "WHAT'S NEXT renderer, lifecycle bridge, and both PS4 Video menu controls already present."
 fi
 grep -q 'whatsNextBridge.commit_real_frame' "$FLYCAST_SRC/core/rend/vulkan/vulkan_context.cpp" || fail "Missing WHAT'S NEXT history commit hook."
 grep -q 'Mini-DLSS spatial finishing pass' "$FLYCAST_SRC/core/rend/vulkan/frame_gen.cpp" || fail "Missing Mini-DLSS renderer finishing pass."
+grep -Fq "WHAT'S NEXT / Frame Generation" "$SETTINGS_MENU" || fail "WHAT'S NEXT toggle is missing from the PS4 Video menu."
+grep -Fq "Mini-DLSS / Spatial Reconstruction" "$SETTINGS_MENU" || fail "Mini-DLSS toggle is missing from the PS4 Video menu."
+grep -q 'config::FrameGeneration' "$SETTINGS_MENU" || fail "WHAT'S NEXT menu toggle is not bound to its runtime setting."
+grep -q 'config::MiniDLSS' "$SETTINGS_MENU" || fail "Mini-DLSS menu toggle is not bound to its runtime setting."
 
 # libcurl is a static archive built with zlib support; CMake cannot infer the
 # archive's private dependencies from an absolute .a path, so link libz explicitly.
