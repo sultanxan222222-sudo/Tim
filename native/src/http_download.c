@@ -80,7 +80,7 @@ int tim_http_download_system_init(void) {
     if (g_http_context < 0) goto fail;
 
     g_http_template = sceHttpCreateTemplate(g_http_context,
-        "TIM-PS4-Downloader/0.1", ORBIS_HTTP_VERSION_1_1, 0);
+        "TIM-PS4-Downloader/0.1", TIM_ORBIS_HTTP_VERSION_1_1, 0);
     if (g_http_template < 0) goto fail;
     return 0;
 
@@ -91,7 +91,7 @@ fail:
 
 int tim_http_download_start(TimHttpDownload *d, const char *url,
                             const char *destination) {
-    int rc, length_result = ORBIS_HTTP_CONTENTLEN_NOT_FOUND;
+    int rc, length_result = TIM_ORBIS_HTTP_CONTENTLEN_NOT_FOUND;
     size_t content_length = 0;
     int status = 0;
     if (d == NULL || !tim_http_url_is_valid(url) || destination == NULL ||
@@ -120,7 +120,7 @@ int tim_http_download_start(TimHttpDownload *d, const char *url,
         return -1;
     }
     d->request_id = sceHttpCreateRequestWithURL(d->connection_id,
-        ORBIS_METHOD_GET, d->url, 0);
+        TIM_ORBIS_METHOD_GET, d->url, 0);
     if (d->request_id < 0) {
         set_error(d, "Could not create HTTP request");
         close_request(d);
@@ -145,7 +145,7 @@ int tim_http_download_start(TimHttpDownload *d, const char *url,
 
     rc = sceHttpGetResponseContentLength(d->request_id, &length_result,
                                          &content_length);
-    if (rc >= 0 && length_result == ORBIS_HTTP_CONTENTLEN_EXIST)
+    if (rc >= 0 && length_result == TIM_ORBIS_HTTP_CONTENTLEN_EXIST)
         d->total_bytes = (uint64_t)content_length;
 
     /* Do not create arbitrary parent directories or write outside the chosen
