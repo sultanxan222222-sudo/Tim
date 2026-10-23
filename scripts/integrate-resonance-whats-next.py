@@ -53,8 +53,9 @@ def main() -> None:
 	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
 }'''
     # Mini-DLSS variant of Flycast's ordinary presentation quad. It preserves the
-    # existing alpha/colour logic when MINI_DLSS=0 and adds only conservative sharpening
-    # when MINI_DLSS=1. The generated-frame fragment has its corresponding pass above.
+    # existing alpha/colour logic when MINI_DLSS=0. When enabled, it performs
+    # edge-adaptive spatial reconstruction followed by conservative sharpening.
+    # This is spatial filtering, not neural DLSS. The generated-frame fragment has its corresponding pass above.
     quad_fragment_original = '''#if IGNORE_TEX_ALPHA == 1
 \tFragColor.rgb = pushConstants.color.rgb * texture(tex, inUV).rgb;
 \tFragColor.a = pushConstants.color.a;
@@ -63,7 +64,31 @@ def main() -> None:
 #endif'''
     quad_fragment_enhanced = '''vec4 sourceColor = texture(tex, inUV);
 #if MINI_DLSS == 1
-\tvec2 texel = 1.0 / vec2(textureSize(tex, 0));
+\t// Edge-adaptive spatial reconstruction for the low-resolution game image.
+\t// Sample source texels at their centres and interpolate more cautiously
+\t// across strong edges before the finishing sharpen.
+\tvec2 sourceSize = vec2(textureSize(tex, 0));
+\tvec2 sourcePixel = inUV * sourceSize - vec2(0.5);
+\tvec2 sourceBase = floor(sourcePixel);
+\tvec2 sourceFrac = fract(sourcePixel);
+\tvec2 uv00 = (sourceBase + vec2(0.5, 0.5)) / sourceSize;
+\tvec2 uv10 = (sourceBase + vec2(1.5, 0.5)) / sourceSize;
+\tvec2 uv01 = (sourceBase + vec2(0.5, 1.5)) / sourceSize;
+\tvec2 uv11 = (sourceBase + vec2(1.5, 1.5)) / sourceSize;
+\tvec3 c00 = textureLod(tex, uv00, 0.0).rgb;
+\tvec3 c10 = textureLod(tex, uv10, 0.0).rgb;
+\tvec3 c01 = textureLod(tex, uv01, 0.0).rgb;
+\tvec3 c11 = textureLod(tex, uv11, 0.0).rgb;
+\tfloat gx = abs(dot(c00 - c10, vec3(0.2126, 0.7152, 0.0722))) + abs(dot(c01 - c11, vec3(0.2126, 0.7152, 0.0722)));
+\tfloat gy = abs(dot(c00 - c01, vec3(0.2126, 0.7152, 0.0722))) + abs(dot(c10 - c11, vec3(0.2126, 0.7152, 0.0722)));
+\tfloat fx = sourceFrac.x;
+\tfloat fy = sourceFrac.y;
+\tif (gx > gy * 1.5) fx = (fx < 0.5) ? 0.0 : 1.0;
+\tif (gy > gx * 1.5) fy = (fy < 0.5) ? 0.0 : 1.0;
+\tvec3 top = mix(c00, c10, fx);
+\tvec3 bottom = mix(c01, c11, fx);
+\tsourceColor.rgb = mix(top, bottom, fy);
+\tvec2 texel = 1.0 / sourceSize;
 \tvec3 base = sourceColor.rgb;
 \tvec3 n = texture(tex, inUV + vec2(0.0, -texel.y)).rgb;
 \tvec3 s = texture(tex, inUV + vec2(0.0,  texel.y)).rgb;
