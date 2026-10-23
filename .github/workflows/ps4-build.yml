@@ -2,9 +2,17 @@ name: Build Tim PS4 PKG
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/native-http-downloader]
     paths:
       - "native/ps4/**"
+      - "native/src/**"
+      - "native/tests/**"
+      - ".github/workflows/ps4-build.yml"
+  pull_request:
+    paths:
+      - "native/ps4/**"
+      - "native/src/**"
+      - "native/tests/**"
       - ".github/workflows/ps4-build.yml"
   pull_request:
     paths:
@@ -21,6 +29,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Test HTTP URL validation on the host
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror native/src/http_url.c native/tests/test_http_url.c -o /tmp/test_http_url
+          /tmp/test_http_url
 
       - name: Set up Go for the OpenOrbis ELF wrapper
         uses: actions/setup-go@v5
@@ -49,7 +62,7 @@ jobs:
             -v "$PWD:/workspace" \
             -w /workspace \
             openorbisofficial/toolchain:latest \
-            bash -lc 'cd native/ps4 && make clean all'
+            bash -lc 'grep -nE "sceNetInit|sceHttpInit|sceHttpCreateTemplate|sceHttpCreateConnectionWithURL|sceHttpCreateRequestWithURL|sceHttpSendRequest|sceHttpGetStatusCode|sceHttpGetResponseContentLength|sceHttpReadData|sceSslInit|sceHttpDeleteTemplate|sceHttpTerm" /lib/OpenOrbisSDK/include/orbis/{Net.h,Http.h,Ssl.h}; cd native/ps4 && make clean all'
 
       - name: Verify package artifact exists
         run: test -s native/ps4/IV0000-TIMA00001_00-TIMCLIENT0000001.pkg
