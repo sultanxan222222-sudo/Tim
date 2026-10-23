@@ -221,16 +221,15 @@ static const char *download_state_text(const TimHttpDownload *d){
 int main(){
     setvbuf(stdout,NULL,_IONBF,0);
     /* Open a pad for the actual logged-in user; hard-coded user ID 0 can fail. */
-    int userId = -1;
-    (void)sceUserServiceInitialize(NULL);
-    (void)sceUserServiceGetInitialUser(&userId);
+    /*
+     * Keep the controller path on the minimal OpenOrbis Pad API used by the
+     * original native UI. Avoid introducing UserService imports into startup:
+     * the application must still launch even if initial-user lookup fails.
+     */
     (void)scePadInit();
-    int pad = -1;
-    if (userId >= 0) {
-        pad = scePadOpen(userId, ORBIS_PAD_PORT_TYPE_STANDARD, 0, NULL);
-        if (pad < 0)
-            pad = scePadGetHandle(userId, ORBIS_PAD_PORT_TYPE_STANDARD, 0);
-    }
+    int pad = scePadOpen(0, ORBIS_PAD_PORT_TYPE_STANDARD, 0, NULL);
+    if (pad < 0)
+        pad = scePadGetHandle(0, ORBIS_PAD_PORT_TYPE_STANDARD, 0);
     /* OpenOrbis exposes this initializer as void; IME init reports failure. */
     sceCommonDialogInitialize();
     g_common_dialog_ready = 1;
