@@ -221,7 +221,9 @@ int main(){
     setvbuf(stdout,NULL,_IONBF,0);
     scePadInit();
     int pad=scePadOpen(0,ORBIS_PAD_PORT_TYPE_STANDARD,0,NULL);
-    g_common_dialog_ready = (sceCommonDialogInitialize() >= 0);
+    /* OpenOrbis exposes this initializer as void; IME init reports failure. */
+    sceCommonDialogInitialize();
+    g_common_dialog_ready = 1;
     Scene2D*scene=new Scene2D(1920,1080,4);
     if(!scene->Init(0x1200000,2)){
         delete scene;
