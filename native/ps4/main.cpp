@@ -4,11 +4,43 @@
 #include <wchar.h>
 #include <sys/stat.h>
 #include <orbis/Pad.h>
-#include <orbis/ImeDialog.h>
 #include <orbis/CommonDialog.h>
 #include "graphics.h"
 #include "../src/http_download.h"
 #include "../src/http_url.h"
+
+/* Local declarations compensate for incomplete generated OpenOrbis IME headers. */
+typedef enum { ORBIS_DIALOG_OK = 0, ORBIS_DIALOG_CANCEL = 1, ORBIS_DIALOG_ABORD = 2 } OrbisDialogResultStatus;
+typedef enum { ORBIS_V_TOP = 0, ORBIS_V_CENTER = 1, ORBIS_V_VALIGN_BOTTOM = 2 } OrbisVAlignment;
+typedef enum { ORBIS_H_LEFT = 0, ORBIS_H_CENTER = 1, ORBIS_H_RIGHT = 2 } OrbisHAlignment;
+typedef enum { ORBIS_TYPE_DEFAULT = 0, ORBIS_TYPE_BASIC_LATIN = 1, ORBIS_TYPE_TYPE_URL = 2, ORBIS_TYPE_MAIL = 3, ORBIS_TYPE_NUMBER = 4 } OrbisImeType;
+typedef enum { ORBIS__DEFAULT = 0 } OrbisInput;
+typedef enum { ORBIS_BUTTON_LABEL_DEFAULT = 0, ORBIS_BUTTON_LABEL_SEND = 1, ORBIS_BUTTON_LABEL_SEARCH = 2, ORBIS_BUTTON_LABEL_GO = 3 } OrbisButtonLabel;
+typedef enum { ORBIS_DIALOG_STATUS_NONE = 0, ORBIS_DIALOG_STATUS_RUNNING = 1, ORBIS_DIALOG_STATUS_STOPPED = 2 } OrbisDialogStatus;
+typedef struct OrbisImeDialogSetting {
+    uint32_t userId;
+    OrbisImeType type;
+    uint64_t supportedLanguages;
+    OrbisButtonLabel enterLabel;
+    OrbisInput inputMethod;
+    void *filter;
+    uint32_t option;
+    uint32_t maxTextLength;
+    wchar_t *inputTextBuffer;
+    float posx;
+    float posy;
+    OrbisHAlignment horizontalAlignment;
+    OrbisVAlignment verticalAlignment;
+    const wchar_t *placeholder;
+    const wchar_t *title;
+    int8_t reserved[16];
+} OrbisImeDialogSetting;
+typedef struct OrbisDialogResult { OrbisDialogResultStatus endstatus; int8_t reserved[12]; } OrbisDialogResult;
+extern int32_t sceImeDialogInit(const OrbisImeDialogSetting *param, void *paramExtended);
+extern OrbisDialogStatus sceImeDialogGetStatus(void);
+extern int32_t sceImeDialogGetResult(OrbisDialogResult *result);
+extern int32_t sceImeDialogTerm(void);
+
 
 static const uint8_t FONT[][5] = {
     {0x7e,0x11,0x11,0x11,0x7e},{0x7f,0x49,0x49,0x49,0x36},
