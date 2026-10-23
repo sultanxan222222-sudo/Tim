@@ -123,7 +123,6 @@ def main() -> None:
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
         (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
-        (context_cpp, '\t\t\tfgDraw = false;\n'),
         (context_h, '#include "vulkan.h"\n'),
         (context_h, '\tbool fgRealPending = false;\n'),
         (frame_gen_cpp, old_fragment),
@@ -290,7 +289,7 @@ void main()
     replace_once(
         context_cpp,
         '#ifdef __ORBIS__\n\t// a new frame from the renderer',
-        '#ifdef __ORBIS__\n\tbool sourceAccepted = false;\n\t// a new frame from the renderer'
+        '#ifdef __ORBIS__\n\t// a new frame from the renderer'
     )
 
     bridge_gate = '''&& fgPrevExtent == extent;
@@ -305,18 +304,13 @@ void main()
 \t\t\t\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
 \t\t\t\t\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
 \t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
-\t\tsourceAccepted = true; // this source frame reached the normal presentation decision point'''
+\t\twhatsNextBridge.commit_real_frame(); // commit each real source frame after the renderer accepts its image'''
     replace_once(context_cpp, 'fgPrevExtent == extent;', 'fgPrevExtent == extent;\n' + '\n'.join(bridge_gate.splitlines()[1:]))
 
     replace_once(
         context_cpp,
         '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();',
         '\tif (gui_is_open())\n\t{\n\t\tif (!fgWasGuiOpen)\n\t\t{\n\t\t\t++fgGameSession;\n\t\t\twhatsNextBridge.reset();\n\t\t}\n\t\tfgPrevView = vk::ImageView();\n\t}\n\tfgWasGuiOpen = gui_is_open();'
-    )
-    replace_once(
-        context_cpp,
-        '\t\t\tfgDraw = false;\n',
-        '\t\t\tfgDraw = false;\n#ifdef __ORBIS__\n\t\t\tif (sourceAccepted)\n\t\t\t\twhatsNextBridge.commit_real_frame();\n#endif\n'
     )
     replace_once(
         context_h,
@@ -483,7 +477,7 @@ void main()
     replace_once(settings_menu_cpp,
         'config::FrameGeneration));',
         'config::FrameGeneration));\n'
-        '\t\tvideo.items.push_back(toggle(Tnop("Mini-DLSS"),\n'
+        '\t\tvideo.items.push_back(toggle(Tnop("Mini-DLSS / Spatial Reconstruction"),\n'
         '\t\t\t\tTnop("Experimental spatial edge-aware sharpening. Not neural DLSS."),\n'
         '\t\t\t\tconfig::MiniDLSS));')
     replace_once(settings_menu_cpp,
@@ -506,7 +500,6 @@ void main()
     integrated_context = context_cpp.read_text(encoding="utf-8")
     required_hooks = (
         "whatsNextBridge.begin_real_frame",
-        "sourceAccepted = true",
         "whatsNextBridge.commit_real_frame",
         "whatsNextBridge.reset()",
     )
