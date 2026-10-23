@@ -21,7 +21,7 @@ extern void sceNetCtlTerm(void);
 
 #define TIM_HTTP_POOL_SIZE (2U * 1024U * 1024U)
 #define TIM_HTTP_DEFAULT_CHUNK (32U * 1024U)
-#define TIM_HTTP_MAX_CHUNK (256U * 1024U)
+#define TIM_HTTP_MAX_CHUNK (64U * 1024U)
 
 static int g_net_ready = 0;
 static int g_netctl_ready = 0;
