@@ -8,6 +8,7 @@
 #include <orbis/_types/http.h>
 
 #include <stdio.h>
+#include <stdbool.h>
 #include <string.h>
 #include <stdint.h>
 #include <sys/stat.h>
