@@ -5,7 +5,7 @@
 #include <orbis/Http.h>
 #include <orbis/Ssl.h>
 #include <orbis/Net.h>
-#include <orbis/NetCtl.h>
+
 #include <orbis/_types/http.h>
 
 #include <stdio.h>
@@ -13,6 +13,11 @@
 #include <stdint.h>
 #include <sys/stat.h>
 #include <unistd.h>
+
+/* OpenOrbis currently ships a NetCtl.h that includes a missing sys/stdint.h.
+   The exported ABI is simple, so declare these two functions locally. */
+extern int32_t sceNetCtlInit(void);
+extern void sceNetCtlTerm(void);
 
 #define TIM_HTTP_POOL_SIZE (2U * 1024U * 1024U)
 #define TIM_HTTP_DEFAULT_CHUNK (32U * 1024U)
