@@ -6,9 +6,11 @@
    unprototyped void stubs. Declare the documented ABI here so return codes
    and arguments are type-checked against the actual runtime API. */
 extern int32_t sceNetInit(void);
-extern void sceNetTerm(void);
+extern int32_t sceNetTerm(void);
+extern int32_t sceNetPoolCreate(const char *name, int32_t size, int32_t flags);
+extern int32_t sceNetPoolDestroy(int32_t poolId);
 extern int32_t sceSslInit(size_t poolSize);
-extern void sceSslTerm(void);
+extern int32_t sceSslTerm(int32_t sslCtxId);
 extern int32_t sceHttpInit(int32_t memId, int32_t sslId, size_t poolSize);
 extern int32_t sceHttpTerm(int32_t httpCtxId);
 extern int32_t sceHttpCreateTemplate(int32_t httpCtxId, const char *userAgent,
@@ -51,7 +53,8 @@ extern void sceNetCtlTerm(void);
 
 static int g_net_ready = 0;
 static int g_netctl_ready = 0;
-static int g_ssl_ready = 0;
+static int g_net_pool_id = -1;
+static int g_ssl_context_id = -1;
 static int g_http_context = -1;
 static int g_http_template = -1;
 
@@ -84,19 +87,28 @@ int tim_http_download_system_init(void) {
     int rc;
     if (g_http_template >= 0) return 0;
 
-    rc = sceNetInit();
-    if (rc < 0) return -1;
-    g_net_ready = 1;
-
+    /* Match the PS4 initialization order and use IDs returned by each
+       subsystem. Hard-coding 1 for the HTTP net/SSL IDs is not reliable. */
     rc = sceNetCtlInit();
     if (rc < 0) goto fail;
     g_netctl_ready = 1;
 
-    rc = sceSslInit(TIM_HTTP_POOL_SIZE);
+    rc = sceNetInit();
     if (rc < 0) goto fail;
-    g_ssl_ready = 1;
+    g_net_ready = 1;
 
-    g_http_context = sceHttpInit(1, 1, TIM_HTTP_POOL_SIZE);
+    g_net_pool_id = sceNetPoolCreate("TIM_HTTP_NET_POOL",
+                                     (int32_t)TIM_HTTP_POOL_SIZE, 0);
+    if (g_net_pool_id < 0) goto fail;
+
+    g_ssl_context_id = sceSslInit(TIM_HTTP_POOL_SIZE);
+    if (g_ssl_context_id < 0) {
+        g_ssl_context_id = -1;
+        goto fail;
+    }
+
+    g_http_context = sceHttpInit(g_net_pool_id, g_ssl_context_id,
+                                 TIM_HTTP_POOL_SIZE);
     if (g_http_context < 0) goto fail;
 
     g_http_template = sceHttpCreateTemplate(g_http_context,
@@ -236,16 +248,20 @@ void tim_http_download_system_shutdown(void) {
         sceHttpTerm(g_http_context);
         g_http_context = -1;
     }
-    if (g_ssl_ready) {
-        sceSslTerm();
-        g_ssl_ready = 0;
+    if (g_ssl_context_id >= 0) {
+        sceSslTerm(g_ssl_context_id);
+        g_ssl_context_id = -1;
     }
-    if (g_netctl_ready) {
-        sceNetCtlTerm();
-        g_netctl_ready = 0;
+    if (g_net_pool_id >= 0) {
+        sceNetPoolDestroy(g_net_pool_id);
+        g_net_pool_id = -1;
     }
     if (g_net_ready) {
         sceNetTerm();
         g_net_ready = 0;
+    }
+    if (g_netctl_ready) {
+        sceNetCtlTerm();
+        g_netctl_ready = 0;
     }
 }
