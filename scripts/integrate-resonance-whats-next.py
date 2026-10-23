@@ -471,15 +471,21 @@ void main()
     replace_once(option_h,
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\n',
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\nextern Option<bool> MiniDLSS;\n')
+    # Move both experimental controls into a dedicated WHAT'S NEXT group.
+    # Keep Resonance's existing settings panel and all other groups untouched.
     replace_once(settings_menu_cpp,
-        'Tnop("Frame Generation")',
-        'Tnop("WHAT\'S NEXT / Frame Generation")')
+        'video.items.push_back(toggle(Tnop("Frame Generation"),\n'
+        '\t\t\t\tTnop("Experimental: for games that run at 30 fps, a picture made between each two frames, so the screen shows 60. Can wobble around moving edges and adds a little input lag"),\n'
+        '\t\t\t\tconfig::FrameGeneration));',
+        '// WHAT\\'S NEXT controls are placed in their own group below.')
     replace_once(settings_menu_cpp,
-        'config::FrameGeneration));',
-        'config::FrameGeneration));\n'
-        '\t\tvideo.items.push_back(toggle(Tnop("Mini-DLSS / Spatial Reconstruction"),\n'
-        '\t\t\t\tTnop("Experimental spatial edge-aware sharpening. Not neural DLSS."),\n'
-        '\t\t\t\tconfig::MiniDLSS));')
+        'groups.push_back(std::move(video));',
+        'groups.push_back(std::move(video));\n'
+        '\n'
+        '\t\tGroup whatsNext { ICON_FA_DISPLAY, T("WHAT\\'S NEXT"), T("Experimental frame generation and spatial reconstruction"), {} };\n'
+        '\t\twhatsNext.items.push_back(toggle(Tnop("Frame Generation"), Tnop("Experimental frame generation for supported games; may add input lag or visual artefacts."), config::FrameGeneration));\n'
+        '\t\twhatsNext.items.push_back(toggle(Tnop("Mini-DLSS / Spatial Reconstruction"), Tnop("Experimental spatial edge-aware sharpening. Not neural DLSS."), config::MiniDLSS));\n'
+        '\t\tgroups.push_back(std::move(whatsNext));')
     replace_once(settings_menu_cpp,
         'const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };',
         'const float scales[] = { 1.f, 1.1f, 1.5f, 2.f, 3.f, 4.f };')
