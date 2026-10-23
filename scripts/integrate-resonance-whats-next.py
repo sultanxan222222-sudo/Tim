@@ -473,7 +473,7 @@ void main()
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\nextern Option<bool> MiniDLSS;\n')
     replace_once(settings_menu_cpp,
         'Tnop("Frame Generation")',
-        'Tnop("WHAT\'S NEXT (Frame Generation)")')
+        'Tnop("WHAT\'S NEXT / Frame Generation")')
     replace_once(settings_menu_cpp,
         'config::FrameGeneration));',
         'config::FrameGeneration));\n'
@@ -512,8 +512,14 @@ void main()
         raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
         raise SystemExit("Mini-DLSS quad shader variant was not installed.")
+    integrated_menu = settings_menu_cpp.read_text(encoding="utf-8")
+    for label in ("WHAT'S NEXT / Frame Generation", "Mini-DLSS / Spatial Reconstruction"):
+        if label not in integrated_menu:
+            raise SystemExit("Graphics feature toggle missing from the Flycast Video settings menu: " + label)
+    if "config::FrameGeneration" not in integrated_menu or "config::MiniDLSS" not in integrated_menu:
+        raise SystemExit("Graphics menu entries are not bound to their runtime settings.")
 
-    print(f"WHAT'S NEXT lifecycle bridge integrated into {root}")
+    print(f"WHAT'S NEXT and Mini-DLSS integrated into the Flycast Vulkan renderer and Video settings: {root}")
 
 
 if __name__ == "__main__":
