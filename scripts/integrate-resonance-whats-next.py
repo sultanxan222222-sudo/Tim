@@ -32,8 +32,12 @@ def main() -> None:
     shaders_cpp = root / "core/rend/vulkan/shaders.cpp"
     shaders_h = root / "core/rend/vulkan/shaders.h"
     quad_cpp = root / "core/rend/vulkan/quad.cpp"
+    frame_gen_h = root / "core/rend/vulkan/frame_gen.h"
+    option_cpp = root / "core/cfg/option.cpp"
+    option_h = root / "core/cfg/option.h"
+    settings_menu_cpp = root / "shell/ps4/launcher/settings_menu.cpp"
     quad_h = root / "core/rend/vulkan/quad.h"
-    if not all(p.is_file() for p in (context_cpp, context_h, cmake, shaders_cpp, shaders_h, quad_cpp, quad_h, root / "core/rend/vulkan/frame_gen.cpp")):
+    if not all(p.is_file() for p in (context_cpp, context_h, cmake, shaders_cpp, shaders_h, quad_cpp, quad_h, frame_gen_h, option_cpp, option_h, settings_menu_cpp, root / "core/rend/vulkan/frame_gen.cpp")):
         raise SystemExit("Not a Resonance-patched Flycast tree: required Vulkan renderer files are missing.")
 
     module = repo / "dreamcast/mini-dlss"
@@ -112,6 +116,17 @@ def main() -> None:
         (context_cpp, '\tif (config::Rotate90)\n\t\tquadRotatePipeline->BindPipeline(commandBuffer);\n\telse\n\t\tquadPipeline->BindPipeline(commandBuffer);\n'),
         (context_cpp, '\tif (fgDraw && frameGen != nullptr)\n\t\tframeGen->Draw(commandBuffer, *renderPass);\n\telse if (config::Rotate90)\n\t\tquadRotateDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n\telse\n\t\tquadDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'),
         (context_cpp, '\tquadDrawer.reset();\n'),
+        (frame_gen_cpp, ')";\n} // namespace'),
+        (frame_gen_cpp, 'if (!drawPipeline || renderPass != drawRenderPass)'),
+        (frame_gen_cpp, 'ShaderCompiler::Compile(vk::ShaderStageFlagBits::eFragment, kFragment)'),
+        (frame_gen_cpp, '\t\tdrawRenderPass = renderPass;\n'),
+        (frame_gen_h, '\tbool ready = false;\n'),
+        (option_cpp, 'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n'),
+        (option_cpp, 'Option<int> RenderResolution("rend.Resolution", 480);'),
+        (option_h, 'extern Option<bool> FrameGeneration;\n'),
+        (settings_menu_cpp, 'video.items.push_back(toggle(Tnop("Frame Generation"),'),
+        (settings_menu_cpp, 'const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };'),
+        (settings_menu_cpp, 'config::FrameGeneration));'),
         (context_h, '\tstd::unique_ptr<QuadPipeline> quadRotatePipeline;\n'),
         (context_h, '\tstd::unique_ptr<QuadDrawer> quadRotateDrawer;\n'),
     )
@@ -188,27 +203,62 @@ def main() -> None:
 	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
 	// A poor match (something appearing, a cut): use the newer frame.
 	float w = smoothstep(0.03, 0.10, mo.z);
-	vec3 base = mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb;
-
-	// Mini-DLSS spatial finishing pass: restrained, edge-aware sharpening.
-	// It operates in the existing fragment pass, so no extra image/readback is needed.
-	vec2 texel = 1.0 / vec2(textureSize(curTex, 0));
-	vec3 n = textureLod(curTex, uv + vec2(0.0, -texel.y), 0.0).rgb;
-	vec3 s = textureLod(curTex, uv + vec2(0.0,  texel.y), 0.0).rgb;
-	vec3 e = textureLod(curTex, uv + vec2( texel.x, 0.0), 0.0).rgb;
-	vec3 west = textureLod(curTex, uv + vec2(-texel.x, 0.0), 0.0).rgb;
-	float edge = max(max(abs(dot(base - n, vec3(0.2126, 0.7152, 0.0722))),
-	                     abs(dot(base - s, vec3(0.2126, 0.7152, 0.0722)))),
-	                 max(abs(dot(base - e, vec3(0.2126, 0.7152, 0.0722))),
-	                     abs(dot(base - west, vec3(0.2126, 0.7152, 0.0722)))));
-	float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
-	vec3 avg = (n + s + e + west) * 0.25;
-	vec3 sharpened = base + (base - avg) * (0.12 * edgeGate);
-	vec3 lo = min(base, min(min(n, s), min(e, west)));
-	vec3 hi = max(base, max(max(n, s), max(e, west)));
-	color = vec4(clamp(sharpened, lo, hi), 1.0);
+	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
 }'''
     replace_once(frame_gen_cpp, old_fragment, new_fragment)
+    mini_shader_constant = '''const char *const kFragmentMiniDlss = R"(
+#version 450
+layout(location = 0) in vec2 uv;
+layout(location = 0) out vec4 color;
+layout(set = 0, binding = 0) uniform sampler2D prevTex;
+layout(set = 0, binding = 1) uniform sampler2D curTex;
+layout(set = 0, binding = 2) uniform sampler2D motionTex;
+vec4 synth(vec2 p)
+{
+    vec4 mo = textureLod(motionTex, p, 0.0);
+    vec2 m = mo.xy;
+    vec4 a = textureLod(prevTex, p - m * 0.5, 0.0);
+    vec4 b = textureLod(curTex, p + m * 0.5, 0.0);
+    float w = smoothstep(0.03, 0.10, mo.z);
+    return vec4(mix(mix(a, b, 0.5), textureLod(curTex, p, 0.0), w).rgb, 1.0);
+}
+void main()
+{
+    // Mini-DLSS spatial finishing pass: 10% stronger edge-aware sharpening.
+    vec4 center = synth(uv);
+    vec2 texel = 1.0 / vec2(textureSize(curTex, 0));
+    vec3 n = synth(uv + vec2(0.0, -texel.y)).rgb;
+    vec3 s = synth(uv + vec2(0.0,  texel.y)).rgb;
+    vec3 e = synth(uv + vec2( texel.x, 0.0)).rgb;
+    vec3 west = synth(uv + vec2(-texel.x, 0.0)).rgb;
+    float edge = max(max(abs(dot(center.rgb - n, vec3(0.2126, 0.7152, 0.0722))),
+                         abs(dot(center.rgb - s, vec3(0.2126, 0.7152, 0.0722)))),
+                     max(abs(dot(center.rgb - e, vec3(0.2126, 0.7152, 0.0722))),
+                         abs(dot(center.rgb - west, vec3(0.2126, 0.7152, 0.0722)))));
+    float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
+    vec3 avg = (n + s + e + west) * 0.25;
+    vec3 sharpened = center.rgb + (center.rgb - avg) * (0.132 * edgeGate);
+    vec3 lo = min(center.rgb, min(min(n, s), min(e, west)));
+    vec3 hi = max(center.rgb, max(max(n, s), max(e, west)));
+    color = vec4(clamp(sharpened, lo, hi), center.a);
+}
+)";'''
+    replace_once(frame_gen_cpp, ')";\n} // namespace', ')";\n' + mini_shader_constant + '\n} // namespace')
+    replace_once(frame_gen_cpp,
+        '#include "compiler.h"\n',
+        '#include "compiler.h"\n#include "cfg/option.h"\n')
+    replace_once(frame_gen_h,
+        '\tbool ready = false;\n',
+        '\tbool ready = false;\n\tbool drawMiniDlss = false;\n')
+    replace_once(frame_gen_cpp,
+        'if (!drawPipeline || renderPass != drawRenderPass)',
+        'if (!drawPipeline || renderPass != drawRenderPass || drawMiniDlss != config::MiniDLSS)')
+    replace_once(frame_gen_cpp,
+        'ShaderCompiler::Compile(vk::ShaderStageFlagBits::eFragment, kFragment)',
+        'ShaderCompiler::Compile(vk::ShaderStageFlagBits::eFragment, config::MiniDLSS ? kFragmentMiniDlss : kFragment)')
+    replace_once(frame_gen_cpp,
+        '\t\tdrawRenderPass = renderPass;\n',
+        '\t\tdrawRenderPass = renderPass;\n\t\tdrawMiniDlss = config::MiniDLSS;\n')
     replace_once(
         context_h,
         '#include "vulkan.h"\n',
@@ -391,6 +441,40 @@ def main() -> None:
         '\tstd::unique_ptr<QuadDrawer> quadRotateMiniDlssDrawer;\n'
         '#endif\n'
     )
+
+    # Independent switches: WHAT'S NEXT controls generated frames; Mini-DLSS controls
+    # spatial sharpening on ordinary and generated frames. Default internal resolution is
+    # raised by 10% (480p -> 528p); the matching menu choice is added below.
+    replace_once(option_cpp,
+        'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n',
+        'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n'
+        'Option<bool> MiniDLSS("rend.MiniDLSS", true);\n')
+    replace_once(option_cpp,
+        'Option<int> RenderResolution("rend.Resolution", 480);',
+        'Option<int> RenderResolution("rend.Resolution", 528);')
+    replace_once(option_h,
+        'extern Option<bool> FrameGeneration;\n',
+        'extern Option<bool> FrameGeneration;\nextern Option<bool> MiniDLSS;\n')
+    replace_once(settings_menu_cpp,
+        'Tnop("Frame Generation")',
+        'Tnop("WHAT\'S NEXT (Frame Generation)")')
+    replace_once(settings_menu_cpp,
+        'config::FrameGeneration));',
+        'config::FrameGeneration));\n'
+        '\t\tvideo.items.push_back(toggle(Tnop("Mini-DLSS"),\n'
+        '\t\t\t\tTnop("Experimental spatial edge-aware sharpening. Not neural DLSS."),\n'
+        '\t\t\t\tconfig::MiniDLSS));')
+    replace_once(settings_menu_cpp,
+        'const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };',
+        'const float scales[] = { 1.f, 1.1f, 1.5f, 2.f, 3.f, 4.f };')
+    replace_once(context_cpp,
+        'const bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode',
+        'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
+    # Increase the existing 0.12 edge-aware sharpening amount by 10% -> 0.132.
+    shaders_cpp_text = shaders_cpp.read_text(encoding="utf-8")
+    if shaders_cpp_text.count("0.12 * edgeGate") != 1:
+        raise SystemExit("Expected one ordinary-frame Mini-DLSS strength constant.")
+    shaders_cpp.write_text(shaders_cpp_text.replace("0.12 * edgeGate", "0.132 * edgeGate", 1), encoding="utf-8")
 
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
     integrated_cmake = cmake.read_text(encoding="utf-8")
