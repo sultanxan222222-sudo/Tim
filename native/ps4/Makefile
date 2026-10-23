@@ -50,26 +50,26 @@ sce_sys/icon0.png: scripts/make_icon.py
 # Resolve it from the installed SDK rather than shipping an empty placeholder.
 sce_sys/about/right.sprx:
 	mkdir -p sce_sys/about
-	RIGHT_SPRX="$(find "$(TOOLCHAIN)" -type f -path '*/sce_sys/about/right.sprx' -print -quit)"; \
-	if [ -z "$RIGHT_SPRX" ]; then \
-	  RIGHT_SPRX="$(find "$(TOOLCHAIN)" -type f -name right.sprx -print -quit)"; \
+	RIGHT_SPRX="$$(find "$(TOOLCHAIN)" -type f -path '*/sce_sys/about/right.sprx' -print -quit)"; \
+	if [ -z "$$RIGHT_SPRX" ]; then \
+	  RIGHT_SPRX="$$(find "$(TOOLCHAIN)" -type f -name right.sprx -print -quit)"; \
 	fi; \
-	test -n "$RIGHT_SPRX" || { echo "OpenOrbis right.sprx not found in toolchain"; exit 1; }; \
-	cp "$RIGHT_SPRX" $@
+	test -n "$$RIGHT_SPRX" || { echo "OpenOrbis right.sprx not found in toolchain"; exit 1; }; \
+	cp "$$RIGHT_SPRX" $@
 
 # These runtime modules are provided by OpenOrbis and are needed by some
 # toolchain/runtime combinations. Fail the build instead of silently omitting them.
 sce_module/libc.prx:
 	mkdir -p sce_module
-	MODULE="$(find "$(TOOLCHAIN)" -type f -path '*/modules/libc.prx' -print -quit)"; \
-	test -n "$MODULE" || { echo "OpenOrbis libc.prx not found in toolchain"; exit 1; }; \
-	cp "$MODULE" $@
+	MODULE="$$(find "$(TOOLCHAIN)" -type f -path '*/modules/libc.prx' -print -quit)"; \
+	test -n "$$MODULE" || { echo "OpenOrbis libc.prx not found in toolchain"; exit 1; }; \
+	cp "$$MODULE" $@
 
 sce_module/libSceFios2.prx:
 	mkdir -p sce_module
-	MODULE="$(find "$(TOOLCHAIN)" -type f -path '*/modules/libSceFios2.prx' -print -quit)"; \
-	test -n "$MODULE" || { echo "OpenOrbis libSceFios2.prx not found in toolchain"; exit 1; }; \
-	cp "$MODULE" $@
+	MODULE="$$(find "$(TOOLCHAIN)" -type f -path '*/modules/libSceFios2.prx' -print -quit)"; \
+	test -n "$$MODULE" || { echo "OpenOrbis libSceFios2.prx not found in toolchain"; exit 1; }; \
+	cp "$$MODULE" $@
 
 sce_sys/param.sfo: Makefile
 	mkdir -p sce_sys
@@ -87,7 +87,7 @@ sce_sys/param.sfo: Makefile
 
 pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png sce_sys/about/right.sprx sce_module/libc.prx sce_module/libSceFios2.prx
 	@set -eu; \
-	for f in $^; do test -s "$f" || { echo "Missing or empty package file: $f"; exit 1; }; done
+	for f in $^; do test -s "$$f" || { echo "Missing or empty package file: $$f"; exit 1; }; done
 	./tools/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files "$^"
 
 $(CONTENT_ID).pkg: pkg.gp4
