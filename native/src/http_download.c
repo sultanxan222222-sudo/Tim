@@ -6,7 +6,7 @@
 #include <orbis/Ssl.h>
 #include <orbis/Net.h>
 
-#include <orbis/_types/http.h>
+
 
 #include <stdio.h>
 #include <string.h>
@@ -18,6 +18,12 @@
    The exported ABI is simple, so declare these two functions locally. */
 extern int32_t sceNetCtlInit(void);
 extern void sceNetCtlTerm(void);
+
+/* Stable OpenOrbis enum values; the container SDK omits _types/http.h. */
+#define TIM_ORBIS_METHOD_GET 0
+#define TIM_ORBIS_HTTP_VERSION_1_1 2
+#define TIM_ORBIS_HTTP_CONTENTLEN_EXIST 0
+#define TIM_ORBIS_HTTP_CONTENTLEN_NOT_FOUND 1
 
 #define TIM_HTTP_POOL_SIZE (2U * 1024U * 1024U)
 #define TIM_HTTP_DEFAULT_CHUNK (32U * 1024U)
