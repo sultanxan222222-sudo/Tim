@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "native/ps4/**"
+      - "native/src/**"
+      - "native/tests/**"
       - ".github/workflows/ps4-build.yml"
   pull_request:
     paths:
@@ -21,6 +23,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Test HTTP URL validation on the host
+        run: |
+          cc -std=c11 -Wall -Wextra -Werror native/src/http_url.c native/tests/test_http_url.c -o /tmp/test_http_url
+          /tmp/test_http_url
 
       - name: Set up Go for the OpenOrbis ELF wrapper
         uses: actions/setup-go@v5
