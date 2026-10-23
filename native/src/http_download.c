@@ -2,9 +2,29 @@
 #include "http_url.h"
 
 #include <stdbool.h>
-#include <orbis/Http.h>
-#include <orbis/Ssl.h>
-#include <orbis/Net.h>
+/* The bundled OpenOrbis SDK headers expose several imported functions as
+   unprototyped void stubs. Declare the documented ABI here so return codes
+   and arguments are type-checked against the actual runtime API. */
+extern int32_t sceNetInit(void);
+extern void sceNetTerm(void);
+extern int32_t sceSslInit(size_t poolSize);
+extern void sceSslTerm(void);
+extern int32_t sceHttpInit(int32_t memId, int32_t sslId, size_t poolSize);
+extern int32_t sceHttpTerm(int32_t httpCtxId);
+extern int32_t sceHttpCreateTemplate(int32_t httpCtxId, const char *userAgent,
+                                     int32_t httpVer, int32_t proxy);
+extern int32_t sceHttpDeleteTemplate(int32_t templateId);
+extern int32_t sceHttpCreateConnectionWithURL(int32_t templateId,
+                                               const char *url, bool keepalive);
+extern int32_t sceHttpDeleteConnection(int32_t connId);
+extern int32_t sceHttpCreateRequestWithURL(int32_t connId, int32_t method,
+                                           const char *url, uint64_t contentLength);
+extern int32_t sceHttpDeleteRequest(int32_t reqId);
+extern int32_t sceHttpSendRequest(int32_t reqId, const void *postData, size_t size);
+extern int32_t sceHttpGetStatusCode(int32_t reqId, int32_t *statusCode);
+extern int32_t sceHttpGetResponseContentLength(int32_t reqId, int32_t *result,
+                                                size_t *contentLength);
+extern int32_t sceHttpReadData(int32_t reqId, void *data, uint32_t size);
 
 
 
@@ -72,7 +92,7 @@ int tim_http_download_system_init(void) {
     if (rc < 0) goto fail;
     g_netctl_ready = 1;
 
-    rc = sceSslInit(SSL_POOLSIZE);
+    rc = sceSslInit(TIM_HTTP_POOL_SIZE);
     if (rc < 0) goto fail;
     g_ssl_ready = 1;
 
