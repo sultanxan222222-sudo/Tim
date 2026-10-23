@@ -16,7 +16,16 @@ Scene2D::Scene2D(int w, int h, int pixelDepth)
 	this->width = w;
 	this->height = h;
 	this->depth = pixelDepth;
-	
+	this->video = -1;
+	this->directMemOff = 0;
+	this->directMemAllocationSize = 0;
+	this->videoMemSP = 0;
+	this->videoMem = NULL;
+	this->frameBuffers = NULL;
+	this->flipQueue = 0;
+	this->frameBufferCount = 0;
+	this->activeFrameBufferIdx = 0;
+	memset(&this->attr, 0, sizeof(this->attr));
 	this->frameBufferSize = this->width * this->height * this->depth;
 }
 
@@ -156,8 +165,8 @@ void Scene2D::deallocateVideoMem()
 	this->directMemOff = 0;
 	this->directMemAllocationSize = 0;
 	
-	// Free the frame buffer array
-	delete this->frameBuffers;
+	// Free the frame buffer array (allocated with new[])
+	delete[] this->frameBuffers;
 	this->frameBuffers = 0;
 }
 
@@ -235,6 +244,12 @@ void Scene2D::FrameBufferFill(Color color)
 
 void Scene2D::DrawPixel(int x, int y, Color color)
 {
+	// Never write outside the registered framebuffer. A single invalid
+	// coordinate here corrupts direct memory and can terminate the app.
+	if (x < 0 || y < 0 || x >= this->width || y >= this->height ||
+	    this->frameBuffers == NULL)
+		return;
+
 	// Get pixel location based on pitch
 	int pixel = (y * this->width) + x;
 	
@@ -247,16 +262,22 @@ void Scene2D::DrawPixel(int x, int y, Color color)
 
 void Scene2D::DrawRectangle(int x, int y, int w, int h, Color color)
 {
-	int xPos, yPos;
-	
-	// Draw row-by-row, column-by-column
-	for(yPos = y; yPos < y + h; yPos++)
-	{
-		for(xPos = x; xPos < x + w; xPos++)
-		{
+	// Clip the rectangle before iterating to avoid overflow in x+w/y+h and
+	// to keep drawing cost bounded by the visible framebuffer.
+	if (w <= 0 || h <= 0 || this->width <= 0 || this->height <= 0)
+		return;
+	if (x < 0) { w += x; x = 0; }
+	if (y < 0) { h += y; y = 0; }
+	if (x >= this->width || y >= this->height)
+		return;
+	if (w > this->width - x) w = this->width - x;
+	if (h > this->height - y) h = this->height - y;
+	if (w <= 0 || h <= 0)
+		return;
+
+	for (int yPos = y; yPos < y + h; ++yPos)
+		for (int xPos = x; xPos < x + w; ++xPos)
 			DrawPixel(xPos, yPos, color);
-		}
-	}
 }
 
 #ifdef GRAPHICS_USES_FONT
