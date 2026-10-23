@@ -11,6 +11,8 @@ on:
   pull_request:
     paths:
       - "native/ps4/**"
+      - "native/src/**"
+      - "native/tests/**"
       - ".github/workflows/ps4-build.yml"
   workflow_dispatch:
 
