@@ -223,8 +223,7 @@ int main(){
     /* Open a pad for the actual logged-in user; hard-coded user ID 0 can fail. */
     int userId = -1;
     (void)sceUserServiceInitialize(NULL);
-    if (sceUserServiceGetInitialUser(&userId) < 0 || userId < 0)
-        (void)sceUserServiceGetForegroundUser(&userId);
+    (void)sceUserServiceGetInitialUser(&userId);
     (void)scePadInit();
     int pad = -1;
     if (userId >= 0) {
