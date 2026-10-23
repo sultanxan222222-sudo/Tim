@@ -93,5 +93,7 @@ pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png sce_sys/about/right.sprx 
 $(CONTENT_ID).pkg: pkg.gp4
 	$(TOOLCHAIN)/bin/$(CDIR)/PkgTool.Core pkg_build $< .
 
+# Keep sce_sys/icon0.png: CI creates it on the host before running make inside the
+# OpenOrbis container, where python3 may not be installed.
 clean:
-	rm -rf $(INTDIR) sce_sys/param.sfo sce_sys/icon0.png sce_sys/about/right.sprx sce_module eboot.bin pkg.gp4 $(CONTENT_ID).pkg
+	rm -rf $(INTDIR) sce_sys/param.sfo sce_sys/about/right.sprx sce_module eboot.bin pkg.gp4 $(CONTENT_ID).pkg
