@@ -2,7 +2,7 @@ name: Build Tim PS4 PKG
 
 on:
   push:
-    branches: [main]
+    branches: [main, feature/native-http-downloader]
     paths:
       - "native/ps4/**"
       - "native/src/**"
