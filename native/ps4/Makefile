@@ -3,7 +3,7 @@ VERSION     := 0.1.0
 TITLE_ID    := TIMA00001
 CONTENT_ID  := IV0000-TIMA00001_00-TIMCLIENT0000001
 
-LIBS        := -lc -lkernel -lc++ -lSceVideoOut -lScePad
+LIBS        := -lc -lkernel -lc++ -lSceVideoOut -lScePad -lSceNet -lSceNetCtl -lSceSsl -lSceHttp
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := $(shell basename $(CURDIR))
 COMMONDIR   := platform
@@ -13,7 +13,7 @@ CC          := clang
 CCX         := clang++
 LD          := ld.lld
 
-CFILES      := ../src/torrent_queue.c ../src/torrent_engine.c
+CFILES      := ../src/torrent_queue.c ../src/torrent_engine.c ../src/http_url.c ../src/http_download.c
 CPPFILES    := $(wildcard *.cpp)
 COMMONFILES := $(wildcard $(COMMONDIR)/*.cpp)
 OBJS        := $(patsubst ../src/%.c,$(INTDIR)/%.o,$(CFILES)) $(patsubst %.cpp,$(INTDIR)/%.o,$(CPPFILES)) $(patsubst $(COMMONDIR)/%.cpp,$(INTDIR)/%.o,$(COMMONFILES))
