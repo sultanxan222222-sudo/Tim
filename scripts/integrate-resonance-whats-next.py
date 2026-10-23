@@ -477,12 +477,12 @@ void main()
         'video.items.push_back(toggle(Tnop("Frame Generation"),\n'
         '\t\t\t\tTnop("Experimental: for games that run at 30 fps, a picture made between each two frames, so the screen shows 60. Can wobble around moving edges and adds a little input lag"),\n'
         '\t\t\t\tconfig::FrameGeneration));',
-        '// WHAT\\'S NEXT controls are placed in their own group below.')
+        '// WHAT\'S NEXT controls are placed in their own group below.')
     replace_once(settings_menu_cpp,
         'groups.push_back(std::move(video));',
         'groups.push_back(std::move(video));\n'
         '\n'
-        '\t\tGroup whatsNext { ICON_FA_DISPLAY, T("WHAT\\'S NEXT"), T("Experimental frame generation and spatial reconstruction"), {} };\n'
+        '\t\tGroup whatsNext { ICON_FA_DISPLAY, T("WHAT\'S NEXT"), T("Experimental frame generation and spatial reconstruction"), {} };\n'
         '\t\twhatsNext.items.push_back(toggle(Tnop("Frame Generation"), Tnop("Experimental frame generation for supported games; may add input lag or visual artefacts."), config::FrameGeneration));\n'
         '\t\twhatsNext.items.push_back(toggle(Tnop("Mini-DLSS / Spatial Reconstruction"), Tnop("Experimental spatial edge-aware sharpening. Not neural DLSS."), config::MiniDLSS));\n'
         '\t\tgroups.push_back(std::move(whatsNext));')
