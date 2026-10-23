@@ -123,7 +123,7 @@ def main() -> None:
         (frame_gen_h, '\tbool ready = false;\n'),
         (option_cpp, 'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n'),
         (option_cpp, 'Option<int> RenderResolution("rend.Resolution", 480);'),
-        (option_h, 'extern Option<bool> FrameGeneration;\n'),
+        (option_h, 'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\n'),
         (settings_menu_cpp, 'video.items.push_back(toggle(Tnop("Frame Generation"),'),
         (settings_menu_cpp, 'const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };'),
         (settings_menu_cpp, 'config::FrameGeneration));'),
@@ -453,8 +453,8 @@ void main()
         'Option<int> RenderResolution("rend.Resolution", 480);',
         'Option<int> RenderResolution("rend.Resolution", 528);')
     replace_once(option_h,
-        'extern Option<bool> FrameGeneration;\n',
-        'extern Option<bool> FrameGeneration;\nextern Option<bool> MiniDLSS;\n')
+        'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\n',
+        'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\nextern Option<bool> MiniDLSS;\n')
     replace_once(settings_menu_cpp,
         'Tnop("Frame Generation")',
         'Tnop("WHAT\'S NEXT (Frame Generation)")')
