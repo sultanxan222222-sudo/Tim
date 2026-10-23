@@ -36,10 +36,10 @@ typedef struct OrbisImeDialogSetting {
     int8_t reserved[16];
 } OrbisImeDialogSetting;
 typedef struct OrbisDialogResult { OrbisDialogResultStatus endstatus; int8_t reserved[12]; } OrbisDialogResult;
-extern int32_t sceImeDialogInit(const OrbisImeDialogSetting *param, void *paramExtended);
-extern OrbisDialogStatus sceImeDialogGetStatus(void);
-extern int32_t sceImeDialogGetResult(OrbisDialogResult *result);
-extern int32_t sceImeDialogTerm(void);
+extern "C" int32_t sceImeDialogInit(const OrbisImeDialogSetting *param, void *paramExtended);
+extern "C" OrbisDialogStatus sceImeDialogGetStatus(void);
+extern "C" int32_t sceImeDialogGetResult(OrbisDialogResult *result);
+extern "C" int32_t sceImeDialogTerm(void);
 
 
 static const uint8_t FONT[][5] = {
