@@ -203,44 +203,41 @@ def main() -> None:
 	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
 	// A poor match (something appearing, a cut): use the newer frame.
 	float w = smoothstep(0.03, 0.10, mo.z);
-	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
+	vec3 base = mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb;
+
+	// Mini-DLSS spatial finishing pass: 10% stronger edge-aware sharpening.
+	vec2 texel = 1.0 / vec2(textureSize(curTex, 0));
+	vec3 n = textureLod(curTex, uv + vec2(0.0, -texel.y), 0.0).rgb;
+	vec3 s = textureLod(curTex, uv + vec2(0.0,  texel.y), 0.0).rgb;
+	vec3 e = textureLod(curTex, uv + vec2( texel.x, 0.0), 0.0).rgb;
+	vec3 west = textureLod(curTex, uv + vec2(-texel.x, 0.0), 0.0).rgb;
+	float edge = max(max(abs(dot(base - n, vec3(0.2126, 0.7152, 0.0722))),
+	                     abs(dot(base - s, vec3(0.2126, 0.7152, 0.0722)))),
+	                 max(abs(dot(base - e, vec3(0.2126, 0.7152, 0.0722))),
+	                     abs(dot(base - west, vec3(0.2126, 0.7152, 0.0722)))));
+	float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
+	vec3 avg = (n + s + e + west) * 0.25;
+	vec3 sharpened = base + (base - avg) * (0.132 * edgeGate);
+	vec3 lo = min(base, min(min(n, s), min(e, west)));
+	vec3 hi = max(base, max(max(n, s), max(e, west)));
+	color = vec4(clamp(sharpened, lo, hi), 1.0);
 }'''
     replace_once(frame_gen_cpp, old_fragment, new_fragment)
-    mini_shader_constant = '''const char *const kFragmentMiniDlss = R"(
+    mini_shader_constant = '''const char *const kFragmentNormal = R"(
 #version 450
 layout(location = 0) in vec2 uv;
 layout(location = 0) out vec4 color;
 layout(set = 0, binding = 0) uniform sampler2D prevTex;
 layout(set = 0, binding = 1) uniform sampler2D curTex;
 layout(set = 0, binding = 2) uniform sampler2D motionTex;
-vec4 synth(vec2 p)
-{
-    vec4 mo = textureLod(motionTex, p, 0.0);
-    vec2 m = mo.xy;
-    vec4 a = textureLod(prevTex, p - m * 0.5, 0.0);
-    vec4 b = textureLod(curTex, p + m * 0.5, 0.0);
-    float w = smoothstep(0.03, 0.10, mo.z);
-    return vec4(mix(mix(a, b, 0.5), textureLod(curTex, p, 0.0), w).rgb, 1.0);
-}
 void main()
 {
-    // Mini-DLSS spatial finishing pass: 10% stronger edge-aware sharpening.
-    vec4 center = synth(uv);
-    vec2 texel = 1.0 / vec2(textureSize(curTex, 0));
-    vec3 n = synth(uv + vec2(0.0, -texel.y)).rgb;
-    vec3 s = synth(uv + vec2(0.0,  texel.y)).rgb;
-    vec3 e = synth(uv + vec2( texel.x, 0.0)).rgb;
-    vec3 west = synth(uv + vec2(-texel.x, 0.0)).rgb;
-    float edge = max(max(abs(dot(center.rgb - n, vec3(0.2126, 0.7152, 0.0722))),
-                         abs(dot(center.rgb - s, vec3(0.2126, 0.7152, 0.0722)))),
-                     max(abs(dot(center.rgb - e, vec3(0.2126, 0.7152, 0.0722))),
-                         abs(dot(center.rgb - west, vec3(0.2126, 0.7152, 0.0722)))));
-    float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
-    vec3 avg = (n + s + e + west) * 0.25;
-    vec3 sharpened = center.rgb + (center.rgb - avg) * (0.132 * edgeGate);
-    vec3 lo = min(center.rgb, min(min(n, s), min(e, west)));
-    vec3 hi = max(center.rgb, max(max(n, s), max(e, west)));
-    color = vec4(clamp(sharpened, lo, hi), center.a);
+    vec4 mo = textureLod(motionTex, uv, 0.0);
+    vec2 m = mo.xy;
+    vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
+    vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
+    float w = smoothstep(0.03, 0.10, mo.z);
+    color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
 }
 )";'''
     replace_once(frame_gen_cpp, ')";\n} // namespace', ')";\n' + mini_shader_constant + '\n} // namespace')
@@ -255,7 +252,7 @@ void main()
         'if (!drawPipeline || renderPass != drawRenderPass || drawMiniDlss != config::MiniDLSS)')
     replace_once(frame_gen_cpp,
         'ShaderCompiler::Compile(vk::ShaderStageFlagBits::eFragment, kFragment)',
-        'ShaderCompiler::Compile(vk::ShaderStageFlagBits::eFragment, config::MiniDLSS ? kFragmentMiniDlss : kFragment)')
+        'ShaderCompiler::Compile(vk::ShaderStageFlagBits::eFragment, config::MiniDLSS ? kFragment : kFragmentNormal)')
     replace_once(frame_gen_cpp,
         '\t\tdrawRenderPass = renderPass;\n',
         '\t\tdrawRenderPass = renderPass;\n\t\tdrawMiniDlss = config::MiniDLSS;\n')
