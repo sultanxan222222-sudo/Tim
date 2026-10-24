@@ -22,6 +22,8 @@ permissions:
 jobs:
   build-pkg:
     runs-on: ubuntu-latest
+    container:
+      image: xfangfang/pacbrew:250221
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -52,13 +54,29 @@ jobs:
       - name: Generate package icon on the GitHub runner
         run: python3 native/ps4/scripts/make_icon.py native/ps4/sce_sys/icon0.png
 
-      - name: Build with official OpenOrbis toolchain container
+      - name: Install PS4 libtorrent dependencies
+        env:
+          DEPS_URL: https://github.com/thcolin/gamepad-media-center-aggregator/releases/download/ci-deps
+          TORRENT_DEPS_URL: https://github.com/amansingh909/gamepad-media-center-aggregator/releases/download/ci-deps
         run: |
-          docker run --rm --user 0 \
-            -v "$PWD:/workspace" \
-            -w /workspace \
-            openorbisofficial/toolchain:latest \
-            bash -lc 'grep -nE "sceNetInit|sceHttpInit|sceHttpCreateTemplate|sceHttpCreateConnectionWithURL|sceHttpCreateRequestWithURL|sceHttpSendRequest|sceHttpGetStatusCode|sceHttpGetResponseContentLength|sceHttpReadData|sceSslInit|sceHttpDeleteTemplate|sceHttpTerm" /lib/OpenOrbisSDK/include/orbis/{Net.h,Http.h,Ssl.h}; cd native/ps4 && make clean all'
+          set -eu
+          for dep in "boost-headers-1.83.0-1 a3ae84500b4b9d28cef9a2af324f8760d6f97aaba0faf2840e8e3760b2519166" \
+                     "libtorrent-2.0.15-1 052600d00ab7af897e0fca43b03464086e9a7f0b7a80f60ef4d2221ed3443dfd"; do
+            set -- $dep
+            curl -fsSLo /tmp/$1.pkg.tar.gz "$TORRENT_DEPS_URL/ps4-openorbis-$1-any.pkg.tar.gz"
+            echo "$2  /tmp/$1.pkg.tar.gz" | sha256sum -c -
+            pacman --noconfirm -U /tmp/$1.pkg.tar.gz
+          done
+          git config --global --add safe.directory '*'
+
+      - name: Build with OpenOrbis toolchain
+        env:
+          OO_PS4_TOOLCHAIN: /opt/pacbrew/ps4/openorbis
+        run: |
+          set -eu
+          grep -nE "sceNetInit|sceHttpInit|sceHttpCreateTemplate|sceHttpCreateConnectionWithURL|sceHttpCreateRequestWithURL|sceHttpSendRequest|sceHttpGetStatusCode|sceHttpGetResponseContentLength|sceHttpReadData|sceSslInit|sceHttpDeleteTemplate|sceHttpTerm" /opt/pacbrew/ps4/openorbis/include/orbis/{Net.h,Http.h,Ssl.h}
+          cd native/ps4
+          make clean all
 
       - name: Verify package artifact exists
         run: test -s native/ps4/IV0000-TIMA00001_00-TIMCLIENT0000001.pkg
