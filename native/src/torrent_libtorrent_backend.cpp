@@ -40,33 +40,54 @@ static int backend_start(void *opaque, const char *uri, const char *save_path,
                          void **handle_out) {
     if (!opaque || !uri || !*uri || !save_path || !*save_path || !handle_out)
         return -1;
+    *handle_out = nullptr;
     auto *ctx = static_cast<TimLibtorrentContext *>(opaque);
     if (!ctx->session) return -1;
 
-    lt::add_torrent_params params;
-    params.save_path = save_path;
-    lt::error_code ec;
-    if (std::strncmp(uri, "magnet:?", 8) == 0) {
-        params = lt::parse_magnet_uri(uri, ec);
-        if (ec) return -1;
+    /*
+     * C++ allocations and libtorrent operations can throw on low-memory
+     * systems. Keep exceptions inside this C ABI boundary so a failed task
+     * does not terminate the homebrew process.
+     */
+    TimLibtorrentHandle *item = nullptr;
+    try {
+        lt::add_torrent_params params;
         params.save_path = save_path;
-    } else {
-        /* .torrent URLs are intentionally not treated as magnets. The caller
-           must resolve a local .torrent file before passing it to this adapter. */
-        return -1;
-    }
+        lt::error_code ec;
+        if (std::strncmp(uri, "magnet:?", 8) == 0) {
+            params = lt::parse_magnet_uri(uri, ec);
+            if (ec) return -1;
+            params.save_path = save_path;
+        } else {
+            /* The UI routes direct HTTP(S) URLs to the HTTP downloader.
+               Torrent tasks currently accept magnet URIs only. */
+            return -1;
+        }
 
-    auto *item = new (std::nothrow) TimLibtorrentHandle;
-    if (!item) return -1;
-    item->uri = uri;
-    item->save_path = save_path;
-    item->handle = ctx->session->add_torrent(std::move(params), ec);
-    if (ec || !item->handle.is_valid()) {
-        delete item;
+        item = new (std::nothrow) TimLibtorrentHandle;
+        if (!item) return -1;
+        item->uri = uri;
+        item->save_path = save_path;
+        item->handle = ctx->session->add_torrent(std::move(params), ec);
+        if (ec || !item->handle.is_valid()) {
+            delete item;
+            return -1;
+        }
+        *handle_out = item;
+        return 0;
+    } catch (...) {
+        if (item != nullptr) {
+            try {
+                if (ctx->session && item->handle.is_valid())
+                    ctx->session->remove_torrent(item->handle);
+            } catch (...) {
+                /* Preserve the original failure across the C ABI. */
+            }
+            delete item;
+        }
+        *handle_out = nullptr;
         return -1;
     }
-    *handle_out = item;
-    return 0;
 }
 
 static int backend_pause(void *, void *opaque) {
