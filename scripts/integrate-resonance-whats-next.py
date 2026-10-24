@@ -480,12 +480,9 @@ void main()
         '// WHAT\'S NEXT controls are placed in their own group below.')
     replace_once(settings_menu_cpp,
         'groups.push_back(std::move(video));',
-        'groups.push_back(std::move(video));\n'
-        '\n'
-        '\t\tGroup whatsNext { ICON_FA_DISPLAY, T("ЧТО ДАЛЬШЕ"), T("Настройки улучшения чёткости и плавности изображения"), {} };\n'
-        '\t\twhatsNext.items.push_back(toggle(Tnop("Генерация промежуточных кадров"), Tnop("Пытается вставлять дополнительные кадры между настоящими. Может повысить плавность, но возможны задержка управления и артефакты."), config::FrameGeneration));\n'
-        '\t\twhatsNext.items.push_back(toggle(Tnop("Мини-DLSS — повышение чёткости"), Tnop("Подчёркивает контуры и повышает визуальную чёткость. Это пространственная обработка, а не настоящий нейросетевой DLSS."), config::MiniDLSS));\n'
-        '\t\tgroups.push_back(std::move(whatsNext));')
+        '\t\tvideo.items.push_back(toggle(Tnop("Генерация промежуточных кадров"), Tnop("Пытается вставлять дополнительные кадры между настоящими. Может повысить плавность, но возможны задержка управления и артефакты."), config::FrameGeneration));\n'
+        '\t\tvideo.items.push_back(toggle(Tnop("Мини-DLSS — повышение чёткости"), Tnop("Подчёркивает контуры и повышает визуальную чёткость. Это пространственная обработка, а не настоящий нейросетевой DLSS."), config::MiniDLSS));\n'
+        '\t\tgroups.push_back(std::move(video));')
     replace_once(settings_menu_cpp,
         'const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };',
         'const float scales[] = { 1.f, 1.1f, 1.5f, 2.f, 3.f, 4.f };')
@@ -519,7 +516,7 @@ void main()
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
         raise SystemExit("Mini-DLSS quad shader variant was not installed.")
     integrated_menu = settings_menu_cpp.read_text(encoding="utf-8")
-    for label in ("ЧТО ДАЛЬШЕ", "Генерация промежуточных кадров", "Мини-DLSS — повышение чёткости"):
+    for label in ("Генерация промежуточных кадров", "Мини-DLSS — повышение чёткости"):
         if label not in integrated_menu:
             raise SystemExit("Graphics feature toggle missing from the Flycast Video settings menu: " + label)
     if "config::FrameGeneration" not in integrated_menu or "config::MiniDLSS" not in integrated_menu:
