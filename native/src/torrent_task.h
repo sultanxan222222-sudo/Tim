@@ -29,7 +29,7 @@ typedef enum TimTorrentState {
 typedef struct TimTorrentTask {
     char id[41];              /* info-hash when known; empty before metadata */
     char name[256];
-    char source_uri[2048];    /* magnet URI or local/remote .torrent URI */
+    char source_uri[2048];    /* magnet URI; direct HTTP(S) uses http_download */
     char error[256];
     uint64_t received_bytes;
     uint64_t total_bytes;

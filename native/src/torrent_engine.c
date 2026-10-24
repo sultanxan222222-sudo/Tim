@@ -138,8 +138,9 @@ int tim_torrent_engine_poll(TimTorrentEngine *engine, size_t index) {
         return TIM_ENGINE_BACKEND_ERROR;
     if (tim_torrent_queue_update(engine->queue, index, &status) != 0)
         return TIM_ENGINE_BACKEND_ERROR;
-    if (status.state == TIM_TORRENT_COMPLETE || status.state == TIM_TORRENT_ERROR)
-        memset(item, 0, sizeof(*item));
+    /* Keep the backend handle registered after completion or error.
+       The UI can still cancel/remove it, and libtorrent may continue seeding.
+       Clearing this slot here orphaned the handle and made cleanup impossible. */
     return TIM_ENGINE_OK;
 }
 
