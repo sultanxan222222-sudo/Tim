@@ -64,12 +64,34 @@ sce_sys/param.sfo: Makefile
 	$(PKGTOOLS)/PkgTool.Core sfo_setentry $@ TITLE_ID --type Utf8 --maxsize 12 --value '$(TITLE_ID)'
 	$(PKGTOOLS)/PkgTool.Core sfo_setentry $@ VERSION --type Utf8 --maxsize 8 --value '$(VERSION)'
 
+# Write the GP4 manifest explicitly. create-gp4 has known cases where it
+# emits incomplete rootdir entries; PkgTool may still build a PKG that the
+# console rejects. Keep the file list and package metadata explicit here.
 pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png
 	test -s eboot.bin
 	test -s sce_sys/param.sfo
 	test -s sce_sys/icon0.png
-	./tools/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files "$^"
+	@printf '<?xml version="1.0"?>\\n' > $@
+	@printf '<psproject fmt="gp4" version="1000">\\n' >> $@
+	@printf '\\t<volume>\\n' >> $@
+	@printf '\\t\\t<volume_type>pkg_ps4_app</volume_type>\\n' >> $@
+	@printf '\\t\\t<volume_id>PS4VOLUME</volume_id>\\n' >> $@
+	@printf '\\t\\t<volume_ts>2026-01-01 00:00:00</volume_ts>\\n' >> $@
+	@printf '\\t\\t<package content_id="$(CONTENT_ID)" passcode="00000000000000000000000000000000" storage_type="digital50" app_type="full" />\\n' >> $@
+	@printf '\\t\\t<chunk_info chunk_count="1" scenario_count="1"><chunks><chunk id="0" layer_no="0" label="Chunk #0" /></chunks><scenarios default_id="0"><scenario id="0" type="sp" initial_chunk_count="1" label="Scenario #0">0</scenario></scenarios></chunk_info>\\n' >> $@
+	@printf '\\t</volume>\\n' >> $@
+	@printf '\\t<files img_no="0">\\n' >> $@
+	@printf '\\t\\t<file targ_path="eboot.bin" orig_path="eboot.bin" />\\n' >> $@
+	@printf '\\t\\t<file targ_path="sce_sys/param.sfo" orig_path="sce_sys/param.sfo" />\\n' >> $@
+	@printf '\\t\\t<file targ_path="sce_sys/icon0.png" orig_path="sce_sys/icon0.png" />\\n' >> $@
+	@printf '\\t</files>\\n' >> $@
+	@printf '\\t<rootdir><dir targ_name="sce_sys"><dir targ_name="about" /></dir></rootdir>\\n' >> $@
+	@printf '</psproject>\\n' >> $@
 	test -s $@
+	grep -q 'content_id="$(CONTENT_ID)"' $@
+	grep -q 'targ_path="eboot.bin"' $@
+	grep -q 'targ_path="sce_sys/param.sfo"' $@
+	grep -q 'targ_path="sce_sys/icon0.png"' $@
 
 $(CONTENT_ID).pkg: pkg.gp4
 	$(PKGTOOLS)/PkgTool.Core pkg_build $< .
