@@ -224,3 +224,5 @@ jobs:
             /home/runner/dolphinps4-build/src/libdrm
             /home/runner/dolphinps4-build/mesa-venv
           key: ps4-toolchain-v1-${{ github.run_id }}
+
+# Rebuild trigger: regenerate the installable Resonance PKG from the current WHAT'S NEXT source.
