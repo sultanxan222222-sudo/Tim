@@ -287,9 +287,13 @@ int main(){
                 }
             }
             if((buttons&ORBIS_PAD_BUTTON_CIRCLE)&&!(previous&ORBIS_PAD_BUTTON_CIRCLE)){
-                if(tab==1&&download.state==TIM_HTTP_DOWNLOADING){
+                if(tab==1 && download.state==TIM_HTTP_DOWNLOADING){
                     tim_http_download_cancel(&download);
-                    snprintf(statusMessage,sizeof(statusMessage),"DOWNLOAD CANCELLED");
+                    snprintf(statusMessage,sizeof(statusMessage),"HTTP DOWNLOAD CANCELLED");
+                }else if(tab==1 && torrentReady && torrentQueue.count>0){
+                    int rc=tim_torrent_engine_cancel(&torrentEngine,0);
+                    snprintf(statusMessage,sizeof(statusMessage),
+                        rc==TIM_ENGINE_OK?"TORRENT CANCELLED":"TORRENT COULD NOT BE CANCELLED");
                 }
             }
         }
