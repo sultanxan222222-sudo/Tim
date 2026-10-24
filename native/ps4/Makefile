@@ -14,11 +14,13 @@ CCX         := clang++
 LD          := ld.lld
 
 CFILES      := ../src/torrent_queue.c ../src/torrent_engine.c ../src/http_url.c ../src/http_download.c
-CPPFILES    := $(wildcard *.cpp)
+TORRENT_CXX := ../src/torrent_libtorrent_backend.cpp
+CPPFILES    := $(wildcard *.cpp) $(TORRENT_CXX)
 COMMONFILES := $(wildcard $(COMMONDIR)/*.cpp)
-OBJS        := $(patsubst ../src/%.c,$(INTDIR)/%.o,$(CFILES)) $(patsubst %.cpp,$(INTDIR)/%.o,$(CPPFILES)) $(patsubst $(COMMONDIR)/%.cpp,$(INTDIR)/%.o,$(COMMONFILES))
+OBJS        := $(patsubst ../src/%.c,$(INTDIR)/%.o,$(CFILES)) $(patsubst %.cpp,$(INTDIR)/%.o,$(filter %.cpp,$(CPPFILES))) $(patsubst $(COMMONDIR)/%.cpp,$(INTDIR)/%.o,$(COMMONFILES))
 CFLAGS      := --target=x86_64-pc-freebsd12-elf -fPIC -funwind-tables -c -isysroot $(TOOLCHAIN) -isystem $(TOOLCHAIN)/include
-CXXFLAGS    := $(CFLAGS) -isystem $(TOOLCHAIN)/include/c++/v1
+CXXFLAGS    := $(CFLAGS) -isystem $(TOOLCHAIN)/include/c++/v1 -isystem $(TOOLCHAIN)/include -include $(TOOLCHAIN)/include/libtorrent/ps4_compat.h -DBOOST_ASIO_DISABLE_KQUEUE -DBOOST_ASIO_DISABLE_EPOLL -DBOOST_ASIO_DISABLE_EVENTFD
+LDFLAGS     += -L$(TOOLCHAIN)/lib -ltorrent-rasterbar
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 
 .PHONY: all clean
