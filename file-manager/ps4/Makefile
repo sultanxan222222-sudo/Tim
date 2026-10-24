@@ -17,8 +17,8 @@ LIBS        := -lc -lkernel -lc++ -lSceVideoOut -lScePad
 LDFLAGS     := -m elf_x86_64 -pie --script $(TOOLCHAIN)/link.x --eh-frame-hdr -L$(TOOLCHAIN)/lib $(LIBS) $(TOOLCHAIN)/lib/crt1.o
 PKGTOOLS    := $(TOOLCHAIN)/bin/linux
 
-.PHONY: all clean
-all: $(CONTENT_ID).pkg
+.PHONY: all clean verify-pkg
+all: $(CONTENT_ID).pkg verify-pkg
 
 $(INTDIR):
 	mkdir -p $@
@@ -35,11 +35,16 @@ $(INTDIR)/main.o: main.cpp ../file_browser.h ../file_ops.h $(PLATFORM)/graphics.
 $(INTDIR)/graphics.o: $(PLATFORM)/graphics.cpp $(PLATFORM)/graphics.h | $(INTDIR)
 	$(CCX) $(CXXFLAGS) -o $@ $<
 
+# PS4 must receive the FSELF eboot.bin, not the intermediate ELF/OELF.
 eboot.bin: $(OBJS)
+	mkdir -p $(INTDIR)
 	$(LD) $(OBJS) -o $(INTDIR)/file-manager.elf $(LDFLAGS)
+	test -s $(INTDIR)/file-manager.elf
 	./tools/create-fself -in=$(INTDIR)/file-manager.elf -out=$(INTDIR)/file-manager.oelf --eboot "eboot.bin" --paid 0x3800000000000011
 	test -s $(INTDIR)/file-manager.oelf
 	test -s eboot.bin
+	! cmp -s $(INTDIR)/file-manager.elf eboot.bin
+	! cmp -s $(INTDIR)/file-manager.oelf eboot.bin
 
 sce_sys/icon0.png: ../../native/ps4/scripts/make_icon.py
 	mkdir -p sce_sys
@@ -61,11 +66,18 @@ sce_sys/param.sfo: Makefile
 
 pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png
 	test -s eboot.bin
-	./tools/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files "$^"
+	test -s sce_sys/param.sfo
+	test -s sce_sys/icon0.png
+	./tools/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files eboot.bin sce_sys/param.sfo sce_sys/icon0.png
+	test -s $@
 
 $(CONTENT_ID).pkg: pkg.gp4
 	$(PKGTOOLS)/PkgTool.Core pkg_build $< .
 	test -s $@
+
+verify-pkg: $(CONTENT_ID).pkg
+	test -s "$<"
+	test "$(shell wc -c < $<)" -gt 1000000
 
 clean:
 	rm -rf $(INTDIR) sce_sys/param.sfo eboot.bin pkg.gp4 $(CONTENT_ID).pkg
