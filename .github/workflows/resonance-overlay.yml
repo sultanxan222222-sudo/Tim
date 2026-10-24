@@ -43,7 +43,6 @@ jobs:
           grep -q 'fgPrevExtent = vk::Extent2D()' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'MINI_DLSS' /tmp/flycast/core/rend/vulkan/shaders.cpp
           grep -q 'quadMiniDlssFragmentShader' /tmp/flycast/core/rend/vulkan/shaders.h
-          grep -Fq "ЧТО ДАЛЬШЕ" /tmp/flycast/shell/ps4/launcher/settings_menu.cpp
           grep -Fq "Генерация промежуточных кадров" /tmp/flycast/shell/ps4/launcher/settings_menu.cpp
           grep -Fq "Мини-DLSS — повышение чёткости" /tmp/flycast/shell/ps4/launcher/settings_menu.cpp
           grep -q 'config::FrameGeneration' /tmp/flycast/shell/ps4/launcher/settings_menu.cpp
