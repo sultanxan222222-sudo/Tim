@@ -482,9 +482,9 @@ void main()
         'groups.push_back(std::move(video));',
         'groups.push_back(std::move(video));\n'
         '\n'
-        '\t\tGroup whatsNext { ICON_FA_DISPLAY, T("WHAT\'S NEXT"), T("Experimental frame generation and spatial reconstruction"), {} };\n'
-        '\t\twhatsNext.items.push_back(toggle(Tnop("Frame Generation"), Tnop("Experimental frame generation for supported games; may add input lag or visual artefacts."), config::FrameGeneration));\n'
-        '\t\twhatsNext.items.push_back(toggle(Tnop("Mini-DLSS / Spatial Reconstruction"), Tnop("Experimental spatial edge-aware sharpening. Not neural DLSS."), config::MiniDLSS));\n'
+        '\t\tGroup whatsNext { ICON_FA_DISPLAY, T("ЧТО ДАЛЬШЕ"), T("Настройки улучшения чёткости и плавности изображения"), {} };\n'
+        '\t\twhatsNext.items.push_back(toggle(Tnop("Генерация промежуточных кадров"), Tnop("Пытается вставлять дополнительные кадры между настоящими. Может повысить плавность, но возможны задержка управления и артефакты."), config::FrameGeneration));\n'
+        '\t\twhatsNext.items.push_back(toggle(Tnop("Мини-DLSS — повышение чёткости"), Tnop("Подчёркивает контуры и повышает визуальную чёткость. Это пространственная обработка, а не настоящий нейросетевой DLSS."), config::MiniDLSS));\n'
         '\t\tgroups.push_back(std::move(whatsNext));')
     replace_once(settings_menu_cpp,
         'const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };',
