@@ -71,22 +71,22 @@ pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png
 	test -s eboot.bin
 	test -s sce_sys/param.sfo
 	test -s sce_sys/icon0.png
-	@printf '<?xml version="1.0"?>\\n' > $@
-	@printf '<psproject fmt="gp4" version="1000">\\n' >> $@
-	@printf '\\t<volume>\\n' >> $@
-	@printf '\\t\\t<volume_type>pkg_ps4_app</volume_type>\\n' >> $@
-	@printf '\\t\\t<volume_id>PS4VOLUME</volume_id>\\n' >> $@
-	@printf '\\t\\t<volume_ts>2026-01-01 00:00:00</volume_ts>\\n' >> $@
-	@printf '\\t\\t<package content_id="$(CONTENT_ID)" passcode="00000000000000000000000000000000" storage_type="digital50" app_type="full" />\\n' >> $@
-	@printf '\\t\\t<chunk_info chunk_count="1" scenario_count="1"><chunks><chunk id="0" layer_no="0" label="Chunk #0" /></chunks><scenarios default_id="0"><scenario id="0" type="sp" initial_chunk_count="1" label="Scenario #0">0</scenario></scenarios></chunk_info>\\n' >> $@
-	@printf '\\t</volume>\\n' >> $@
-	@printf '\\t<files img_no="0">\\n' >> $@
-	@printf '\\t\\t<file targ_path="eboot.bin" orig_path="eboot.bin" />\\n' >> $@
-	@printf '\\t\\t<file targ_path="sce_sys/param.sfo" orig_path="sce_sys/param.sfo" />\\n' >> $@
-	@printf '\\t\\t<file targ_path="sce_sys/icon0.png" orig_path="sce_sys/icon0.png" />\\n' >> $@
-	@printf '\\t</files>\\n' >> $@
-	@printf '\\t<rootdir><dir targ_name="sce_sys"><dir targ_name="about" /></dir></rootdir>\\n' >> $@
-	@printf '</psproject>\\n' >> $@
+	@printf '<?xml version="1.0"?>\n' > $@
+	@printf '<psproject fmt="gp4" version="1000">\n' >> $@
+	@printf '\t<volume>\n' >> $@
+	@printf '\t\t<volume_type>pkg_ps4_app</volume_type>\n' >> $@
+	@printf '\t\t<volume_id>PS4VOLUME</volume_id>\n' >> $@
+	@printf '\t\t<volume_ts>2026-01-01 00:00:00</volume_ts>\n' >> $@
+	@printf '\t\t<package content_id="$(CONTENT_ID)" passcode="00000000000000000000000000000000" storage_type="digital50" app_type="full" />\n' >> $@
+	@printf '\t\t<chunk_info chunk_count="1" scenario_count="1"><chunks><chunk id="0" layer_no="0" label="Chunk #0" /></chunks><scenarios default_id="0"><scenario id="0" type="sp" initial_chunk_count="1" label="Scenario #0">0</scenario></scenarios></chunk_info>\n' >> $@
+	@printf '\t</volume>\n' >> $@
+	@printf '\t<files img_no="0">\n' >> $@
+	@printf '\t\t<file targ_path="eboot.bin" orig_path="eboot.bin" />\n' >> $@
+	@printf '\t\t<file targ_path="sce_sys/param.sfo" orig_path="sce_sys/param.sfo" />\n' >> $@
+	@printf '\t\t<file targ_path="sce_sys/icon0.png" orig_path="sce_sys/icon0.png" />\n' >> $@
+	@printf '\t</files>\n' >> $@
+	@printf '\t<rootdir><dir targ_name="sce_sys"><dir targ_name="about" /></dir></rootdir>\n' >> $@
+	@printf '</psproject>\n' >> $@
 	test -s $@
 	grep -q 'content_id="$(CONTENT_ID)"' $@
 	grep -q 'targ_path="eboot.bin"' $@
