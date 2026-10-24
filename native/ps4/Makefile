@@ -3,7 +3,7 @@ VERSION     := 0.1.0
 TITLE_ID    := TIMA00001
 CONTENT_ID  := IV0000-TIMA00001_00-TIMCLIENT0000001
 
-LIBS        := -lc -lkernel -lc++ -lSceVideoOut -lScePad -lSceUserService -lSceNet -lSceNetCtl -lSceSsl -lSceHttp -lSceImeDialog -lSceCommonDialog -lSceSystemService
+LIBS        := -lc -lkernel -lc++ -lSceVideoOut -lScePad -lSceUserService -lSceNet -lSceNetCtl -lSceSsl -lSceHttp -lSceImeDialog -lSceCommonDialog
 TOOLCHAIN   := $(OO_PS4_TOOLCHAIN)
 PROJDIR     := tim
 COMMONDIR   := platform
