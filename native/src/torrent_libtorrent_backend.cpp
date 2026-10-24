@@ -11,6 +11,7 @@
 #include <cstdio>
 #include <cstring>
 #include <memory>
+#include <new>
 #include <string>
 #include <vector>
 
@@ -121,6 +122,8 @@ static int backend_poll(void *, void *opaque, TimTorrentTask *out) {
 }
 } // namespace
 
+extern "C" void tim_libtorrent_backend_shutdown(void *opaque);
+
 extern "C" int tim_libtorrent_backend_init(TimTorrentBackend *out) {
     if (!out) return -1;
     auto *ctx = new (std::nothrow) TimLibtorrentContext;
@@ -148,6 +151,7 @@ extern "C" int tim_libtorrent_backend_init(TimTorrentBackend *out) {
     out->resume = backend_resume;
     out->cancel = backend_cancel;
     out->poll = backend_poll;
+    out->shutdown = tim_libtorrent_backend_shutdown;
     return 0;
 }
 
