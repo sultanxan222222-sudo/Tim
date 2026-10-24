@@ -248,6 +248,7 @@ int main(){
     const Color white=rgb(235,242,255),muted=rgb(135,157,183),cyan=rgb(50,220,220);
     int frame=0,selected=0,tab=0,previous=0,dialogOpen=0;
     int inputMode=0;
+    char statusMessage[256]="READY - ADD MAGNET OR DIRECT URL";
     TimHttpDownload download; memset(&download,0,sizeof(download));
     TimTorrentQueue torrentQueue; tim_torrent_queue_init(&torrentQueue);
     TimTorrentBackend torrentBackend; memset(&torrentBackend,0,sizeof(torrentBackend));
@@ -257,7 +258,6 @@ int main(){
     if(!torrentReady) snprintf(statusMessage,sizeof(statusMessage),"TORRENT ENGINE INIT FAILED");
     download.connection_id=-1; download.request_id=-1;
     wchar_t urlInput[2048]; char urlAscii[2048];
-    char statusMessage[256]="READY - ADD MAGNET OR DIRECT URL";
     if (!g_common_dialog_ready)
         snprintf(statusMessage,sizeof(statusMessage),"SYSTEM URL KEYBOARD UNAVAILABLE");
     const char*games[]={"ADD MAGNET","DIRECT URL","DOWNLOADS"};
