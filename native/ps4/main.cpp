@@ -10,6 +10,8 @@
 #include "graphics.h"
 #include "../src/http_download.h"
 #include "../src/http_url.h"
+#include "../src/torrent_engine.h"
+#include "../src/torrent_task.h"
 
 /* Local declarations compensate for incomplete generated OpenOrbis IME headers. */
 typedef enum { ORBIS_DIALOG_OK = 0, ORBIS_DIALOG_CANCEL = 1, ORBIS_DIALOG_ABORD = 2 } OrbisDialogResultStatus;
@@ -65,6 +67,7 @@ static const uint8_t FONT[][5] = {
     {0x36,0x49,0x49,0x49,0x36},{0x06,0x49,0x49,0x29,0x1e}
 };
 static int g_common_dialog_ready = 0;
+extern "C" int tim_libtorrent_backend_init(TimTorrentBackend *out);
 
 static Color rgb(uint8_t r,uint8_t g,uint8_t b){ Color c={r,g,b}; return c; }
 static void rect(Scene2D*s,int x,int y,int w,int h,uint8_t r,uint8_t g,uint8_t b){
@@ -101,8 +104,8 @@ static int open_url_dialog(wchar_t *buffer, size_t capacity){
     setting.type = ORBIS_TYPE_TYPE_URL;
     setting.maxTextLength = (uint32_t)(capacity - 1);
     setting.inputTextBuffer = buffer;
-    setting.placeholder = L"https://server.example/file.pkg";
-    setting.title = L"Enter a direct URL for an authorized PKG";
+    setting.placeholder = L"magnet:?xt=urn:btih:... or https://...";
+    setting.title = L"Enter magnet URI or direct URL";
     setting.horizontalAlignment = ORBIS_H_CENTER;
     setting.verticalAlignment = ORBIS_V_CENTER;
     return sceImeDialogInit(&setting, NULL);
@@ -244,14 +247,21 @@ int main(){
     scene->SetActiveFrameBuffer(0);
     const Color white=rgb(235,242,255),muted=rgb(135,157,183),cyan=rgb(50,220,220);
     int frame=0,selected=0,tab=0,previous=0,dialogOpen=0;
+    int inputMode=0;
     TimHttpDownload download; memset(&download,0,sizeof(download));
+    TimTorrentQueue torrentQueue; tim_torrent_queue_init(&torrentQueue);
+    TimTorrentBackend torrentBackend; memset(&torrentBackend,0,sizeof(torrentBackend));
+    TimTorrentEngine torrentEngine; memset(&torrentEngine,0,sizeof(torrentEngine));
+    int torrentReady = tim_libtorrent_backend_init(&torrentBackend) == 0 &&
+        tim_torrent_engine_init(&torrentEngine,&torrentQueue,&torrentBackend) == TIM_ENGINE_OK;
+    if(!torrentReady) snprintf(statusMessage,sizeof(statusMessage),"TORRENT ENGINE INIT FAILED");
     download.connection_id=-1; download.request_id=-1;
     wchar_t urlInput[2048]; char urlAscii[2048];
-    char statusMessage[256]="READY - SELECT ENTER PKG URL";
+    char statusMessage[256]="READY - ADD MAGNET OR DIRECT URL";
     if (!g_common_dialog_ready)
         snprintf(statusMessage,sizeof(statusMessage),"SYSTEM URL KEYBOARD UNAVAILABLE");
-    const char*games[]={"ROCKET LEAGUE","BRAWLHALLA","ENTER PKG URL"};
-    const char*types[]={"NO VERIFIED URL","NO VERIFIED URL","HTTP OR HTTPS"};
+    const char*games[]={"ADD MAGNET","DIRECT URL","DOWNLOADS"};
+    const char*types[]={"BITTORRENT ENGINE","HTTP OR HTTPS","ACTIVE TASKS"};
     for(;;){
         OrbisPadData state; memset(&state,0,sizeof(state));
         if(pad>=0)scePadReadState(pad,&state);
@@ -262,12 +272,18 @@ int main(){
             if((buttons&ORBIS_PAD_BUTTON_LEFT)&&!(previous&ORBIS_PAD_BUTTON_LEFT))tab=0;
             if((buttons&ORBIS_PAD_BUTTON_RIGHT)&&!(previous&ORBIS_PAD_BUTTON_RIGHT))tab=1;
             if((buttons&ORBIS_PAD_BUTTON_CROSS)&&!(previous&ORBIS_PAD_BUTTON_CROSS)){
-                if(tab==0&&selected==2){
+                if(tab==0&&selected==0){
+                    inputMode=1;
                     if(open_url_dialog(urlInput,sizeof(urlInput)/sizeof(urlInput[0]))>=0)
                         dialogOpen=1;
-                    else snprintf(statusMessage,sizeof(statusMessage),"COULD NOT OPEN URL KEYBOARD");
-                }else if(tab==0){
-                    snprintf(statusMessage,sizeof(statusMessage),"NO VERIFIED DIRECT URL FOR THIS TITLE");
+                    else snprintf(statusMessage,sizeof(statusMessage),"COULD NOT OPEN SYSTEM KEYBOARD");
+                }else if(tab==0&&selected==1){
+                    inputMode=2;
+                    if(open_url_dialog(urlInput,sizeof(urlInput)/sizeof(urlInput[0]))>=0)
+                        dialogOpen=1;
+                    else snprintf(statusMessage,sizeof(statusMessage),"COULD NOT OPEN SYSTEM KEYBOARD");
+                }else if(tab==0&&selected==2){
+                    tab=1;
                 }
             }
             if((buttons&ORBIS_PAD_BUTTON_CIRCLE)&&!(previous&ORBIS_PAD_BUTTON_CIRCLE)){
@@ -284,9 +300,28 @@ int main(){
                 sizeof(urlInput)/sizeof(urlInput[0]),urlAscii,sizeof(urlAscii));
             if(dialogResult!=0){
                 dialogOpen=0;
-                if(dialogResult>0) (void)begin_download(&download,urlAscii,statusMessage,sizeof(statusMessage));
-                else snprintf(statusMessage,sizeof(statusMessage),"URL ENTRY CANCELLED");
+                if(dialogResult>0 && inputMode==1){
+                    if(!torrentReady) snprintf(statusMessage,sizeof(statusMessage),"TORRENT ENGINE NOT AVAILABLE");
+                    else if(strncmp(urlAscii,"magnet:?",8)!=0)
+                        snprintf(statusMessage,sizeof(statusMessage),"USE A MAGNET URI STARTING magnet:?");
+                    else if(!ensure_directory("/data/Tim") || !ensure_directory("/data/Tim/torrents"))
+                        snprintf(statusMessage,sizeof(statusMessage),"CANNOT CREATE TORRENT FOLDER");
+                    else {
+                        int index=tim_torrent_queue_add(&torrentQueue,urlAscii,"Torrent");
+                        if(index<0) snprintf(statusMessage,sizeof(statusMessage),"CANNOT ADD MAGNET TO QUEUE");
+                        else if(tim_torrent_engine_start(&torrentEngine,(size_t)index,"/data/Tim/torrents")!=TIM_ENGINE_OK)
+                            snprintf(statusMessage,sizeof(statusMessage),"TORRENT START FAILED - CHECK NETWORK");
+                        else { snprintf(statusMessage,sizeof(statusMessage),"TORRENT ADDED AND STARTED"); tab=1; }
+                    }
+                } else if(dialogResult>0 && inputMode==2)
+                    (void)begin_download(&download,urlAscii,statusMessage,sizeof(statusMessage));
+                else snprintf(statusMessage,sizeof(statusMessage),"ENTRY CANCELLED");
+                inputMode=0;
             }
+        }
+        if(torrentReady){
+            for(size_t ti=0;ti<torrentQueue.count;++ti)
+                (void)tim_torrent_engine_poll(&torrentEngine,ti);
         }
         if(download.state==TIM_HTTP_DOWNLOADING){
             int step=tim_http_download_step(&download,8192);
@@ -308,8 +343,8 @@ int main(){
             card(scene,700,335,520,300,games[1],types[1],selected==1);
             card(scene,1280,335,520,300,games[2],types[2],selected==2);
             rect(scene,120,680,1680,200,20,33,52);
-            txt(scene,"CROSS ON ENTER PKG URL OPENS SYSTEM KEYBOARD",155,720,3,white);
-            txt(scene,"ONLY DOWNLOAD PACKAGES YOU ARE AUTHORIZED TO USE",155,785,2,muted);
+            txt(scene,"CROSS - ADD MAGNET OR DIRECT DOWNLOAD URL",155,720,3,white);
+            txt(scene,"TORRENT FILES SAVE TO DATA TIM TORRENTS",155,785,2,muted);
             txt(scene,statusMessage,155,830,2,cyan);
         }else{
             rect(scene,120,335,1680,545,20,33,52);
@@ -331,7 +366,21 @@ int main(){
             }else{
                 txt(scene,statusMessage,160,530,2,muted);
             }
-            txt(scene,"CIRCLE - CANCEL ACTIVE DOWNLOAD",160,720,3,white);
+            if(torrentQueue.count>0){
+                const TimTorrentTask *task=tim_torrent_queue_get(&torrentQueue,0);
+                if(task){
+                    char detail[128];
+                    snprintf(detail,sizeof(detail),"TORRENT %u%% PEERS %u SEEDS %u",
+                        tim_torrent_progress(task),task->peers,task->seeds);
+                    txt(scene,detail,160,650,3,cyan);
+                    txt(scene,task->state==TIM_TORRENT_COMPLETE?"TORRENT COMPLETE":
+                        task->state==TIM_TORRENT_ERROR?"TORRENT ERROR":
+                        task->state==TIM_TORRENT_METADATA?"FETCHING METADATA":
+                        task->state==TIM_TORRENT_PAUSED?"TORRENT PAUSED":"TORRENT ACTIVE",
+                        160,690,2,white);
+                }
+            }
+            txt(scene,"CIRCLE - CANCEL ACTIVE HTTP DOWNLOAD",160,760,2,white);
             txt(scene,"LEFT RIGHT - SWITCH TAB",160,800,2,muted);
         }
         txt(scene,"TIM - NATIVE PS4 APPLICATION",120,950,2,muted);
