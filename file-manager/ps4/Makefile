@@ -68,7 +68,7 @@ pkg.gp4: eboot.bin sce_sys/param.sfo sce_sys/icon0.png
 	test -s eboot.bin
 	test -s sce_sys/param.sfo
 	test -s sce_sys/icon0.png
-	./tools/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files eboot.bin sce_sys/param.sfo sce_sys/icon0.png
+	./tools/create-gp4 -out $@ --content-id=$(CONTENT_ID) --files "$^"
 	test -s $@
 
 $(CONTENT_ID).pkg: pkg.gp4
