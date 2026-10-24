@@ -519,13 +519,13 @@ void main()
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
         raise SystemExit("Mini-DLSS quad shader variant was not installed.")
     integrated_menu = settings_menu_cpp.read_text(encoding="utf-8")
-    for label in ("WHAT'S NEXT", "Frame Generation", "Mini-DLSS / Spatial Reconstruction"):
+    for label in ("ЧТО ДАЛЬШЕ", "Генерация промежуточных кадров", "Мини-DLSS — повышение чёткости"):
         if label not in integrated_menu:
             raise SystemExit("Graphics feature toggle missing from the Flycast Video settings menu: " + label)
     if "config::FrameGeneration" not in integrated_menu or "config::MiniDLSS" not in integrated_menu:
         raise SystemExit("Graphics menu entries are not bound to their runtime settings.")
 
-    print(f"WHAT'S NEXT and Mini-DLSS integrated into the Flycast Vulkan renderer and Video settings: {root}")
+    print(f"Русское меню улучшения изображения подключено к рендереру Flycast: {root}")
 
 
 if __name__ == "__main__":
