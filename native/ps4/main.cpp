@@ -7,10 +7,6 @@
 #include <orbis/Pad.h>
 #include <orbis/UserService.h>
 #include <orbis/CommonDialog.h>
-#include <orbis/Sysmodule.h>
-
-/* Browser launch entry point used by PS4 system service. */
-extern "C" int sceSystemServiceLaunchWebBrowser(const char *uri, void *param);
 #include "graphics.h"
 #include "../src/http_download.h"
 #include "../src/http_url.h"
@@ -254,25 +250,22 @@ int main(){
     char statusMessage[256]="READY - SELECT ENTER PKG URL";
     if (!g_common_dialog_ready)
         snprintf(statusMessage,sizeof(statusMessage),"SYSTEM URL KEYBOARD UNAVAILABLE");
-    const char*games[]={"ROCKET LEAGUE","BRAWLHALLA","LOVE-GAMES1 PS4","ENTER PKG URL"};
-    const char*types[]={"NO VERIFIED URL","NO VERIFIED URL","OPEN PS4 GAMES SECTION","HTTP OR HTTPS"};
+    const char*games[]={"ROCKET LEAGUE","BRAWLHALLA","ENTER PKG URL"};
+    const char*types[]={"NO VERIFIED URL","NO VERIFIED URL","HTTP OR HTTPS"};
     for(;;){
         OrbisPadData state; memset(&state,0,sizeof(state));
         if(pad>=0)scePadReadState(pad,&state);
         int buttons=(int)state.buttons;
         if(!dialogOpen){
-            if((buttons&ORBIS_PAD_BUTTON_UP)&&!(previous&ORBIS_PAD_BUTTON_UP))selected=(selected+3)%4;
-            if((buttons&ORBIS_PAD_BUTTON_DOWN)&&!(previous&ORBIS_PAD_BUTTON_DOWN))selected=(selected+1)%4;
+            if((buttons&ORBIS_PAD_BUTTON_UP)&&!(previous&ORBIS_PAD_BUTTON_UP))selected=(selected+2)%3;
+            if((buttons&ORBIS_PAD_BUTTON_DOWN)&&!(previous&ORBIS_PAD_BUTTON_DOWN))selected=(selected+1)%3;
             if((buttons&ORBIS_PAD_BUTTON_LEFT)&&!(previous&ORBIS_PAD_BUTTON_LEFT))tab=0;
             if((buttons&ORBIS_PAD_BUTTON_RIGHT)&&!(previous&ORBIS_PAD_BUTTON_RIGHT))tab=1;
             if((buttons&ORBIS_PAD_BUTTON_CROSS)&&!(previous&ORBIS_PAD_BUTTON_CROSS)){
-                if(tab==0&&selected==3){
+                if(tab==0&&selected==2){
                     if(open_url_dialog(urlInput,sizeof(urlInput)/sizeof(urlInput[0]))>=0)
                         dialogOpen=1;
                     else snprintf(statusMessage,sizeof(statusMessage),"COULD NOT OPEN URL KEYBOARD");
-                }else if(tab==0&&selected==2){
-                    int browserResult = sceSystemServiceLaunchWebBrowser("https://love-games1.net/load/igry_dlja_konsolej/igry_dlja_playstation_4/42", NULL);
-                    snprintf(statusMessage,sizeof(statusMessage), browserResult < 0 ? "BROWSER LAUNCH FAILED" : "OPENING LOVE-GAMES1 IN PS4 BROWSER");
                 }else if(tab==0){
                     snprintf(statusMessage,sizeof(statusMessage),"NO VERIFIED DIRECT URL FOR THIS TITLE");
                 }
@@ -311,12 +304,11 @@ int main(){
         txt(scene,"DOWNLOADS",410,240,3,tab==1?cyan:muted);
         rect(scene,120,290,1680,3,40,70,92);
         if(tab==0){
-            card(scene,120,335,390,300,games[0],types[0],selected==0);
-            card(scene,535,335,390,300,games[1],types[1],selected==1);
-            card(scene,950,335,390,300,games[2],types[2],selected==2);
-            card(scene,1365,335,390,300,games[3],types[3],selected==3);
+            card(scene,120,335,520,300,games[0],types[0],selected==0);
+            card(scene,700,335,520,300,games[1],types[1],selected==1);
+            card(scene,1280,335,520,300,games[2],types[2],selected==2);
             rect(scene,120,680,1680,200,20,33,52);
-            txt(scene,"CROSS ON LOVE-GAMES1 OPENS PS4 BROWSER",155,720,3,white);
+            txt(scene,"CROSS ON ENTER PKG URL OPENS SYSTEM KEYBOARD",155,720,3,white);
             txt(scene,"ONLY DOWNLOAD PACKAGES YOU ARE AUTHORIZED TO USE",155,785,2,muted);
             txt(scene,statusMessage,155,830,2,cyan);
         }else{
