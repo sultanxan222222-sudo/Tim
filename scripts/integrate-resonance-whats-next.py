@@ -491,9 +491,12 @@ void main()
         'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
     # Use a stronger but locally bounded spatial finish and a 1.5x internal-resolution default.
     shaders_cpp_text = shaders_cpp.read_text(encoding="utf-8")
-    if shaders_cpp_text.count("0.12 * edgeGate") != 1:
-        raise SystemExit("Expected one ordinary-frame Mini-DLSS strength constant.")
-    shaders_cpp.write_text(shaders_cpp_text.replace("0.12 * edgeGate", "0.132 * edgeGate", 1), encoding="utf-8")
+    strength_anchors = ("0.12 * edgeGate", "0.132 * edgeGate", "0.28 * edgeGate")
+    strength_matches = [anchor for anchor in strength_anchors if shaders_cpp_text.count(anchor) == 1]
+    if len(strength_matches) != 1:
+        raise SystemExit("Expected exactly one ordinary-frame Mini-DLSS strength constant; found: " + ", ".join(strength_matches))
+    shaders_cpp_text = shaders_cpp_text.replace(strength_matches[0], "0.28 * edgeGate", 1)
+    shaders_cpp.write_text(shaders_cpp_text, encoding="utf-8")
 
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
     integrated_cmake = cmake.read_text(encoding="utf-8")
