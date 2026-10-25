@@ -101,11 +101,16 @@ MotionField estimate_block_motion(GrayImageView previous,
             const int radius = static_cast<int>(config.search_radius);
             for (int dy = -radius; dy <= radius; ++dy) {
                 for (int dx = -radius; dx <= radius; ++dx) {
-                    const int cx = static_cast<int>(x) + dx;
-                    const int cy = static_cast<int>(y) + dy;
-                    if (cx < 0 || cy < 0 ||
-                        cx + static_cast<int>(size) > static_cast<int>(current.width) ||
-                        cy + static_cast<int>(size) > static_cast<int>(current.height))
+                    // Search offsets can push a coordinate beyond INT_MAX even
+                    // though the source dimensions themselves fit in int. Use a
+                    // wider signed type for candidate arithmetic to avoid UB.
+                    const std::int64_t cx = static_cast<std::int64_t>(x) + dx;
+                    const std::int64_t cy = static_cast<std::int64_t>(y) + dy;
+                    const std::int64_t max_x =
+                        static_cast<std::int64_t>(current.width - size);
+                    const std::int64_t max_y =
+                        static_cast<std::int64_t>(current.height - size);
+                    if (cx < 0 || cy < 0 || cx > max_x || cy > max_y)
                         continue;
                     const double score = sad(previous, current, x, y,
                         static_cast<std::uint32_t>(cx), static_cast<std::uint32_t>(cy),
