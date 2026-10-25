@@ -102,10 +102,10 @@ def main() -> None:
 \t\t    abs(lumaB - dot(west, vec3(0.2126, 0.7152, 0.0722)))));
 \tfloat edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
 \tvec3 average = (n + s + e + west) * 0.25;
-\tvec3 sharpened = base + (base - average) * (0.12 * edgeGate);
+\tvec3 sharpened = base + (base - average) * (0.28 * edgeGate);
 \tvec3 lo = min(base, min(min(n, s), min(e, west)));
 \tvec3 hi = max(base, max(max(n, s), max(e, west)));
-\tsourceColor.rgb = clamp(sharpened, lo, hi);
+\tsourceColor.rgb = clamp(sharpened, max(lo - vec3(0.035), vec3(0.0)), min(hi + vec3(0.035), vec3(1.0)));
 #endif
 #if IGNORE_TEX_ALPHA == 1
 \tFragColor.rgb = pushConstants.color.rgb * sourceColor.rgb;
@@ -241,10 +241,10 @@ def main() -> None:
 	                     abs(dot(base - west, vec3(0.2126, 0.7152, 0.0722)))));
 	float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
 	vec3 avg = (n + s + e + west) * 0.25;
-	vec3 sharpened = base + (base - avg) * (0.132 * edgeGate);
+	vec3 sharpened = base + (base - avg) * (0.28 * edgeGate);
 	vec3 lo = min(base, min(min(n, s), min(e, west)));
 	vec3 hi = max(base, max(max(n, s), max(e, west)));
-	color = vec4(clamp(sharpened, lo, hi), 1.0);
+	color = vec4(clamp(sharpened, max(lo - vec3(0.035), vec3(0.0)), min(hi + vec3(0.035), vec3(1.0))), 1.0);
 }'''
     replace_once(frame_gen_cpp, old_fragment, new_fragment)
     mini_shader_constant = '''const char *const kFragmentNormal = R"(
@@ -467,7 +467,7 @@ void main()
         'Option<bool> MiniDLSS("rend.MiniDLSS", true);\n')
     replace_once(option_cpp,
         'Option<int> RenderResolution("rend.Resolution", 480);',
-        'Option<int> RenderResolution("rend.Resolution", 528);')
+        'Option<int> RenderResolution("rend.Resolution", 720);')
     replace_once(option_h,
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\n',
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\nextern Option<bool> MiniDLSS;\n')
@@ -489,7 +489,7 @@ void main()
     replace_once(context_cpp,
         'const bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode',
         'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
-    # Increase the existing 0.12 edge-aware sharpening amount by 10% -> 0.132.
+    # Use a stronger but locally bounded spatial finish and a 1.5x internal-resolution default.
     shaders_cpp_text = shaders_cpp.read_text(encoding="utf-8")
     if shaders_cpp_text.count("0.12 * edgeGate") != 1:
         raise SystemExit("Expected one ordinary-frame Mini-DLSS strength constant.")
