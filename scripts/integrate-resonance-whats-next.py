@@ -53,8 +53,9 @@ def main() -> None:
 	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
 }'''
     # Mini-DLSS variant of Flycast's ordinary presentation quad. It preserves the
-    # existing alpha/colour logic when MINI_DLSS=0 and adds only conservative sharpening
-    # when MINI_DLSS=1. The generated-frame fragment has its corresponding pass above.
+    # existing alpha/colour logic when MINI_DLSS=0. When enabled, it performs
+    # edge-adaptive spatial reconstruction followed by conservative sharpening.
+    # This is spatial filtering, not neural DLSS. The generated-frame fragment has its corresponding pass above.
     quad_fragment_original = '''#if IGNORE_TEX_ALPHA == 1
 \tFragColor.rgb = pushConstants.color.rgb * texture(tex, inUV).rgb;
 \tFragColor.a = pushConstants.color.a;
@@ -63,7 +64,31 @@ def main() -> None:
 #endif'''
     quad_fragment_enhanced = '''vec4 sourceColor = texture(tex, inUV);
 #if MINI_DLSS == 1
-\tvec2 texel = 1.0 / vec2(textureSize(tex, 0));
+\t// Edge-adaptive spatial reconstruction for the low-resolution game image.
+\t// Sample source texels at their centres and interpolate more cautiously
+\t// across strong edges before the finishing sharpen.
+\tvec2 sourceSize = vec2(textureSize(tex, 0));
+\tvec2 sourcePixel = inUV * sourceSize - vec2(0.5);
+\tvec2 sourceBase = floor(sourcePixel);
+\tvec2 sourceFrac = fract(sourcePixel);
+\tvec2 uv00 = (sourceBase + vec2(0.5, 0.5)) / sourceSize;
+\tvec2 uv10 = (sourceBase + vec2(1.5, 0.5)) / sourceSize;
+\tvec2 uv01 = (sourceBase + vec2(0.5, 1.5)) / sourceSize;
+\tvec2 uv11 = (sourceBase + vec2(1.5, 1.5)) / sourceSize;
+\tvec3 c00 = textureLod(tex, uv00, 0.0).rgb;
+\tvec3 c10 = textureLod(tex, uv10, 0.0).rgb;
+\tvec3 c01 = textureLod(tex, uv01, 0.0).rgb;
+\tvec3 c11 = textureLod(tex, uv11, 0.0).rgb;
+\tfloat gx = abs(dot(c00 - c10, vec3(0.2126, 0.7152, 0.0722))) + abs(dot(c01 - c11, vec3(0.2126, 0.7152, 0.0722)));
+\tfloat gy = abs(dot(c00 - c01, vec3(0.2126, 0.7152, 0.0722))) + abs(dot(c10 - c11, vec3(0.2126, 0.7152, 0.0722)));
+\tfloat fx = sourceFrac.x;
+\tfloat fy = sourceFrac.y;
+\tif (gx > gy * 1.5) fx = (fx < 0.5) ? 0.0 : 1.0;
+\tif (gy > gx * 1.5) fy = (fy < 0.5) ? 0.0 : 1.0;
+\tvec3 top = mix(c00, c10, fx);
+\tvec3 bottom = mix(c01, c11, fx);
+\tsourceColor.rgb = mix(top, bottom, fy);
+\tvec2 texel = 1.0 / sourceSize;
 \tvec3 base = sourceColor.rgb;
 \tvec3 n = texture(tex, inUV + vec2(0.0, -texel.y)).rgb;
 \tvec3 s = texture(tex, inUV + vec2(0.0,  texel.y)).rgb;
@@ -77,10 +102,10 @@ def main() -> None:
 \t\t    abs(lumaB - dot(west, vec3(0.2126, 0.7152, 0.0722)))));
 \tfloat edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
 \tvec3 average = (n + s + e + west) * 0.25;
-\tvec3 sharpened = base + (base - average) * (0.12 * edgeGate);
+\tvec3 sharpened = base + (base - average) * (0.28 * edgeGate);
 \tvec3 lo = min(base, min(min(n, s), min(e, west)));
 \tvec3 hi = max(base, max(max(n, s), max(e, west)));
-\tsourceColor.rgb = clamp(sharpened, lo, hi);
+\tsourceColor.rgb = clamp(sharpened, max(lo - vec3(0.035), vec3(0.0)), min(hi + vec3(0.035), vec3(1.0)));
 #endif
 #if IGNORE_TEX_ALPHA == 1
 \tFragColor.rgb = pushConstants.color.rgb * sourceColor.rgb;
@@ -98,7 +123,6 @@ def main() -> None:
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
         (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
-        (context_cpp, '\t\t\tfgDraw = false;\n'),
         (context_h, '#include "vulkan.h"\n'),
         (context_h, '\tbool fgRealPending = false;\n'),
         (frame_gen_cpp, old_fragment),
@@ -217,10 +241,10 @@ def main() -> None:
 	                     abs(dot(base - west, vec3(0.2126, 0.7152, 0.0722)))));
 	float edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
 	vec3 avg = (n + s + e + west) * 0.25;
-	vec3 sharpened = base + (base - avg) * (0.132 * edgeGate);
+	vec3 sharpened = base + (base - avg) * (0.28 * edgeGate);
 	vec3 lo = min(base, min(min(n, s), min(e, west)));
 	vec3 hi = max(base, max(max(n, s), max(e, west)));
-	color = vec4(clamp(sharpened, lo, hi), 1.0);
+	color = vec4(clamp(sharpened, max(lo - vec3(0.035), vec3(0.0)), min(hi + vec3(0.035), vec3(1.0))), 1.0);
 }'''
     replace_once(frame_gen_cpp, old_fragment, new_fragment)
     mini_shader_constant = '''const char *const kFragmentNormal = R"(
@@ -265,7 +289,7 @@ void main()
     replace_once(
         context_cpp,
         '#ifdef __ORBIS__\n\t// a new frame from the renderer',
-        '#ifdef __ORBIS__\n\tbool sourceAccepted = false;\n\t// a new frame from the renderer'
+        '#ifdef __ORBIS__\n\t// a new frame from the renderer'
     )
 
     bridge_gate = '''&& fgPrevExtent == extent;
@@ -280,18 +304,13 @@ void main()
 \t\t\t\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
 \t\t\t\t\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
 \t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
-\t\tsourceAccepted = true; // this source frame reached the normal presentation decision point'''
+\t\twhatsNextBridge.commit_real_frame(); // commit each real source frame after the renderer accepts its image'''
     replace_once(context_cpp, 'fgPrevExtent == extent;', 'fgPrevExtent == extent;\n' + '\n'.join(bridge_gate.splitlines()[1:]))
 
     replace_once(
         context_cpp,
         '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();',
         '\tif (gui_is_open())\n\t{\n\t\tif (!fgWasGuiOpen)\n\t\t{\n\t\t\t++fgGameSession;\n\t\t\twhatsNextBridge.reset();\n\t\t}\n\t\tfgPrevView = vk::ImageView();\n\t}\n\tfgWasGuiOpen = gui_is_open();'
-    )
-    replace_once(
-        context_cpp,
-        '\t\t\tfgDraw = false;\n',
-        '\t\t\tfgDraw = false;\n#ifdef __ORBIS__\n\t\t\tif (sourceAccepted)\n\t\t\t\twhatsNextBridge.commit_real_frame();\n#endif\n'
     )
     replace_once(
         context_h,
@@ -448,30 +467,36 @@ void main()
         'Option<bool> MiniDLSS("rend.MiniDLSS", true);\n')
     replace_once(option_cpp,
         'Option<int> RenderResolution("rend.Resolution", 480);',
-        'Option<int> RenderResolution("rend.Resolution", 528);')
+        'Option<int> RenderResolution("rend.Resolution", 720);')
     replace_once(option_h,
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\n',
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\nextern Option<bool> MiniDLSS;\n')
+    # Move both experimental controls into a dedicated WHAT'S NEXT group.
+    # Keep Resonance's existing settings panel and all other groups untouched.
     replace_once(settings_menu_cpp,
-        'Tnop("Frame Generation")',
-        'Tnop("WHAT\'S NEXT (Frame Generation)")')
+        'video.items.push_back(toggle(Tnop("Frame Generation"),\n'
+        '\t\t\t\tTnop("Experimental: for games that run at 30 fps, a picture made between each two frames, so the screen shows 60. Can wobble around moving edges and adds a little input lag"),\n'
+        '\t\t\t\tconfig::FrameGeneration));',
+        '// WHAT\'S NEXT controls are placed in their own group below.')
     replace_once(settings_menu_cpp,
-        'config::FrameGeneration));',
-        'config::FrameGeneration));\n'
-        '\t\tvideo.items.push_back(toggle(Tnop("Mini-DLSS"),\n'
-        '\t\t\t\tTnop("Experimental spatial edge-aware sharpening. Not neural DLSS."),\n'
-        '\t\t\t\tconfig::MiniDLSS));')
+        'groups.push_back(std::move(video));',
+        '\t\tvideo.items.push_back(toggle(Tnop("Генерация промежуточных кадров"), Tnop("Пытается вставлять дополнительные кадры между настоящими. Может повысить плавность, но возможны задержка управления и артефакты."), config::FrameGeneration));\n'
+        '\t\tvideo.items.push_back(toggle(Tnop("Мини-DLSS — повышение чёткости"), Tnop("Подчёркивает контуры и повышает визуальную чёткость. Это пространственная обработка, а не настоящий нейросетевой DLSS."), config::MiniDLSS));\n'
+        '\t\tgroups.push_back(std::move(video));')
     replace_once(settings_menu_cpp,
         'const float scales[] = { 1.f, 1.5f, 2.f, 3.f, 4.f };',
         'const float scales[] = { 1.f, 1.1f, 1.5f, 2.f, 3.f, 4.f };')
     replace_once(context_cpp,
         'const bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode',
         'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
-    # Increase the existing 0.12 edge-aware sharpening amount by 10% -> 0.132.
+    # Use a stronger but locally bounded spatial finish and a 1.5x internal-resolution default.
     shaders_cpp_text = shaders_cpp.read_text(encoding="utf-8")
-    if shaders_cpp_text.count("0.12 * edgeGate") != 1:
-        raise SystemExit("Expected one ordinary-frame Mini-DLSS strength constant.")
-    shaders_cpp.write_text(shaders_cpp_text.replace("0.12 * edgeGate", "0.132 * edgeGate", 1), encoding="utf-8")
+    strength_anchors = ("0.12 * edgeGate", "0.132 * edgeGate", "0.28 * edgeGate")
+    strength_matches = [anchor for anchor in strength_anchors if shaders_cpp_text.count(anchor) == 1]
+    if len(strength_matches) != 1:
+        raise SystemExit("Expected exactly one ordinary-frame Mini-DLSS strength constant; found: " + ", ".join(strength_matches))
+    shaders_cpp_text = shaders_cpp_text.replace(strength_matches[0], "0.28 * edgeGate", 1)
+    shaders_cpp.write_text(shaders_cpp_text, encoding="utf-8")
 
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
     integrated_cmake = cmake.read_text(encoding="utf-8")
@@ -481,7 +506,6 @@ void main()
     integrated_context = context_cpp.read_text(encoding="utf-8")
     required_hooks = (
         "whatsNextBridge.begin_real_frame",
-        "sourceAccepted = true",
         "whatsNextBridge.commit_real_frame",
         "whatsNextBridge.reset()",
     )
@@ -494,8 +518,14 @@ void main()
         raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
         raise SystemExit("Mini-DLSS quad shader variant was not installed.")
+    integrated_menu = settings_menu_cpp.read_text(encoding="utf-8")
+    for label in ("Генерация промежуточных кадров", "Мини-DLSS — повышение чёткости"):
+        if label not in integrated_menu:
+            raise SystemExit("Graphics feature toggle missing from the Flycast Video settings menu: " + label)
+    if "config::FrameGeneration" not in integrated_menu or "config::MiniDLSS" not in integrated_menu:
+        raise SystemExit("Graphics menu entries are not bound to their runtime settings.")
 
-    print(f"WHAT'S NEXT lifecycle bridge integrated into {root}")
+    print(f"Русское меню улучшения изображения подключено к рендереру Flycast: {root}")
 
 
 if __name__ == "__main__":
