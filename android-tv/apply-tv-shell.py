@@ -155,7 +155,7 @@ quad_h = CORE / "core" / "rend" / "gles" / "quad.h"
 replace_once(
     quad_h,
     'void draw(GLuint texId, bool rotate = false, bool swapY = false, const float *coords = nullptr, const float *color = nullptr);',
-    'void draw(GLuint texId, bool rotate = false, bool swapY = false, const float *coords = nullptr, const float *color = nullptr, bool applyVideoFilter = false);',
+    'void draw(GLuint texId, bool rotate = false, bool swapY = false, const float *coords = nullptr, const float *color = nullptr, bool applyVideoFilter = false, int sourceWidth = 0, int sourceHeight = 0);',
     "quad draw filter argument",
 )
 replace_once(
@@ -248,13 +248,13 @@ replace_once(
 replace_once(
     quad_cpp,
     'void GlQuadDrawer::draw(GLuint texId, bool rotate, bool swapY, const float *coords, const float *color)\n',
-    'void GlQuadDrawer::draw(GLuint texId, bool rotate, bool swapY, const float *coords, const float *color, bool applyVideoFilter)\n',
+    'void GlQuadDrawer::draw(GLuint texId, bool rotate, bool swapY, const float *coords, const float *color, bool applyVideoFilter, int sourceWidth, int sourceHeight)\n',
     "quad draw implementation signature",
 )
 replace_once(
     quad_cpp,
     '\tglUniform4fv(rotate ? rot90TintUniform : tintUniform, 1, color);\n',
-    '\tglUniform4fv(rotate ? rot90TintUniform : tintUniform, 1, color);\n\tGLint viewport[4] = { 0, 0, 1, 1 };\n\tglGetIntegerv(GL_VIEWPORT, viewport);\n\tglUniform1i(rotate ? rot90VideoFilterUniform : videoFilterUniform, applyVideoFilter ? config::VideoFilter.get() : 0);\n\tglUniform2f(rotate ? rot90OutputSizeUniform : outputSizeUniform, viewport[2] > 0 ? (float)viewport[2] : 1.f, viewport[3] > 0 ? (float)viewport[3] : 1.f);\n',
+    '\tglUniform4fv(rotate ? rot90TintUniform : tintUniform, 1, color);\n\tGLint viewport[4] = { 0, 0, 1, 1 };\n\tglGetIntegerv(GL_VIEWPORT, viewport);\n\tglUniform1i(rotate ? rot90VideoFilterUniform : videoFilterUniform, applyVideoFilter ? config::VideoFilter.get() : 0);\n\tglUniform2f(rotate ? rot90OutputSizeUniform : outputSizeUniform, sourceWidth > 0 ? (float)sourceWidth : (viewport[2] > 0 ? (float)viewport[2] : 1.f), sourceHeight > 0 ? (float)sourceHeight : (viewport[3] > 0 ? (float)viewport[3] : 1.f));\n',
     "per-frame filter uniforms",
 )
 gldraw = CORE / "core" / "rend" / "gles" / "gldraw.cpp"
@@ -267,7 +267,7 @@ replace_once(
 replace_once(
     gldraw,
     'gl.quadDrawer->draw(framebuffer->getTexture(), config::Rotate90, true, vertices);',
-    'gl.quadDrawer->draw(framebuffer->getTexture(), config::Rotate90, true, vertices, nullptr, config::VideoFilter != 0);',
+    'gl.quadDrawer->draw(framebuffer->getTexture(), config::Rotate90, true, vertices, nullptr, config::VideoFilter != 0, framebuffer->getWidth(), framebuffer->getHeight());',
     "apply filter to final screen output only",
 )
 
