@@ -69,6 +69,13 @@ public final class TvHomeActivity extends Activity {
         if (launchIntent != null && Intent.ACTION_VIEW.equals(launchIntent.getAction())
                 && launchIntent.getData() != null) {
             Uri uri = launchIntent.getData();
+            int readGrant = launchIntent.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
+            if (readGrant != 0
+                    && (launchIntent.getFlags() & Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION) != 0) {
+                try {
+                    getContentResolver().takePersistableUriPermission(uri, readGrant);
+                } catch (SecurityException ignored) { }
+            }
             rememberGame(uri, queryDisplayName(uri));
             launchCore(uri);
             finish();
