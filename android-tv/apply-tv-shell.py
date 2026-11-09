@@ -115,6 +115,31 @@ replace_once(
     "native Flycast settings reload",
 )
 
+# The RK3528 Mali-450 target is OpenGL ES 2.0 class. Upstream's generic
+# Android CMake default selects the ES3 shader path; build an explicit ES2
+# renderer and ES2 ImGui backend so the app can run on this target.
+cmake_root = CORE / "CMakeLists.txt"
+replace_once(
+    cmake_root,
+    'target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)',
+    '''if(USE_GLES2)
+            target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES2 IMGUI_IMPL_OPENGL_ES2)
+        else()
+            target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)
+        endif()''',
+    "select GLES2 for RK3528 when requested",
+)
+gradle_file = CORE / "shell" / "android-studio" / "flycast" / "build.gradle.kts"
+replace_once(
+    gradle_file,
+    '                arguments += "-DANDROID_ARM_MODE=arm"\n',
+    '                arguments += "-DANDROID_ARM_MODE=arm"\n'
+    '                arguments += "-DUSE_GLES2=ON"\n'
+    '                arguments += "-DUSE_OPENGL=ON"\n'
+    '                arguments += "-DUSE_VULKAN=OFF"\n',
+    "configure the Android TV build for the RK3528 GLES2 GPU",
+)
+
 # Add a lightweight post-process pass to Flycast's final GLES presentation quad.
 quad_h = CORE / "core" / "rend" / "gles" / "quad.h"
 replace_once(
