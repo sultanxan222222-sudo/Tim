@@ -10,6 +10,7 @@ import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.AtomicFile;
 import android.preference.PreferenceManager;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
@@ -379,7 +380,8 @@ public final class TvHomeActivity extends Activity {
         putIniValue(lines, "config", "Dreamcast.Region", "3");
         putIniValue(lines, "config", "Dreamcast.Broadcast", "4");
 
-        FileOutputStream out = new FileOutputStream(config, false);
+        AtomicFile atomicConfig = new AtomicFile(config);
+        FileOutputStream out = atomicConfig.startWrite();
         try {
             for (String line : lines) {
                 out.write(line.getBytes(StandardCharsets.UTF_8));
@@ -387,8 +389,10 @@ public final class TvHomeActivity extends Activity {
             }
             out.flush();
             out.getFD().sync();
-        } finally {
-            out.close();
+            atomicConfig.finishWrite(out);
+        } catch (Exception e) {
+            atomicConfig.failWrite(out);
+            throw e;
         }
     }
 
