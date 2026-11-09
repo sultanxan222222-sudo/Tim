@@ -291,8 +291,8 @@ public final class TvHomeActivity extends Activity {
         addInfoCard(page, aaText,
                 "Сглаживание достигается повышением внутреннего разрешения. Отдельный переключатель MSAA в этой версии движка недоступен.");
 
-        addInfoCard(page, "ИСКАЖЕНИЯ И ПОЛОСЫ НА ЭКРАНЕ",
-                "Включён безопасный режим совместимости: движок сам выбирает обработку кадров и текстур. Принудительные режимы, которые могли вызывать мерцание, наложение кадров и растянутые полосы, больше не навязываются.");
+        addInfoCard(page, "СОРТИРОВКА ПОЛИГОНОВ (MALI-450 / GLES2)",
+                "Включён режим Per Strip вместо Per Triangle: он меняет порядок отрисовки прозрачных полигонов и может убрать сильные наложения и растяжения моделей на Mali-450. Это совместимый компромисс; точная сортировка Per Pixel требует OpenGL ES 3.2 и на GLES2 недоступна.");
 
         addInfoCard(page, "РЕТРО-ФИЛЬТРЫ",
                 "Временно отключены в этой сборке: проверяемая версия использует штатные шейдеры Flycast для надёжного запуска на GLES2. Эффекты вернутся после отдельной проверки совместимости.");
@@ -365,6 +365,9 @@ public final class TvHomeActivity extends Activity {
         putIniValue(lines, "config", "ta.skip", "0");
         putIniValue(lines, "config", "rend.AnisotropicFiltering", String.valueOf(anisotropic));
         putIniValue(lines, "config", "rend.LinearInterpolation", "yes");
+        // Mali-450 GLES2 cannot use Flycast's accurate per-pixel OIT path.
+        // Per-strip sorting is the compatibility fallback for polygon-overlap artifacts.
+        putIniValue(lines, "config", "rend.PerStripSorting", "yes");
         // Let Flycast choose renderer threading, framebuffer handling and region defaults.
         // Forced overrides can cause flicker, frame overlap and broken textures on some GPUs.
         removeIniValue(lines, "config", "rend.ThreadedRendering");
