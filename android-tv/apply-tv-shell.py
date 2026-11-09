@@ -121,8 +121,8 @@ replace_once(
 android_jni_cmake = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "jni" / "src" / "CMakeLists.txt"
 replace_once(
     android_jni_cmake,
-    '\t\tswappygl.cpp\n\t\tswappyvk.cpp)',
-    '\t\tswappygl.cpp)',
+    '\t\t\tswappygl.cpp\n\t\t\tswappyvk.cpp)',
+    '\t\t\tswappygl.cpp)',
     "exclude Vulkan-only Android frame-pacing bridge from GLES2 build",
 )
 
