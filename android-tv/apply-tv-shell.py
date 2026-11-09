@@ -36,6 +36,69 @@ for required in (source, manifest):
 destination.parent.mkdir(parents=True, exist_ok=True)
 destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
 
+# Undo the forced Per-Strip workaround. Flycast documents Per-Strip as faster
+# but less reliable for geometry ordering; let its default Per-Triangle mode run.
+replace_once(
+    destination,
+    'putIniValue(lines, "config", "rend.PerStripSorting", "yes");',
+    'removeIniValue(lines, "config", "rend.PerStripSorting");',
+    "restore Flycast default Per-Triangle polygon sorting",
+)
+replace_once(
+    destination,
+    '"Включён режим Per Strip вместо Per Triangle: он меняет порядок отрисовки прозрачных полигонов и может убрать сильные наложения и растяжения моделей на Mali-450. Это совместимый компромисс; точная сортировка Per Pixel требует OpenGL ES 3.2 и на GLES2 недоступна.");',
+    '"Возвращён штатный режим Per Triangle. Принудительный Per Strip отключён: на графике Mali он может нарушать геометрию моделей.");',
+    "correct Russian graphics explanation",
+)
+
+# GLES2 palette workaround: the GPU-side paletted-texture path is known to
+# produce corrupted graphics on Mali-450-class drivers. Use Flycast's existing
+# CPU palette conversion path instead of enabling DumpTextures (which writes
+# every texture to storage as a debugging side effect).
+tex_cache = CORE / "core" / "rend" / "TexCache.h"
+replace_once(
+    tex_cache,
+    '''\tstatic bool IsGpuHandledPaletted(TSP tsp, TCW tcw, int area)
+\t{
+\t\t// Some palette textures are handled on the GPU
+\t\t// This is currently limited to textures using nearest or bilinear filtering and not mipmapped.
+\t\t// In 2-volume mode, only area 0 can be handled on the gpu.
+\t\t// Enabling texture upscaling or dumping also disables this mode.
+\t\treturn (tcw.PixelFmt == PixelPal4 || tcw.PixelFmt == PixelPal8)
+\t\t\t\t&& config::TextureUpscale == 1
+\t\t\t\t&& !config::DumpTextures
+\t\t\t\t&& !custom_texture.enabled()
+\t\t\t\t&& tsp.FilterMode <= 1
+\t\t\t\t&& !tcw.MipMapped
+\t\t\t\t&& !tcw.VQ_Comp
+\t\t\t\t&& area == 0;
+\t}''',
+    '''\tstatic bool IsGpuHandledPaletted(TSP tsp, TCW tcw, int area)
+\t{
+\t\t// GPU-side palette lookup is unreliable on this Android GLES2 Mali target.
+\t\t// Fall back to Flycast's normal CPU palette conversion without dumping
+\t\t// texture files to storage.
+\t\t#if defined(__ANDROID__) && defined(GLES2)
+\t\treturn false;
+\t\t#else
+\t\t// Some palette textures are handled on the GPU
+\t\t// This is currently limited to textures using nearest or bilinear filtering and not mipmapped.
+\t\t// In 2-volume mode, only area 0 can be handled on the gpu.
+\t\t// Enabling texture upscaling or dumping also disables this mode.
+\t\treturn (tcw.PixelFmt == PixelPal4 || tcw.PixelFmt == PixelPal8)
+\t\t\t\t&& config::TextureUpscale == 1
+\t\t\t\t&& !config::DumpTextures
+\t\t\t\t&& !custom_texture.enabled()
+\t\t\t\t&& tsp.FilterMode <= 1
+\t\t\t\t&& !tcw.MipMapped
+\t\t\t\t&& !tcw.VQ_Comp
+\t\t\t\t&& area == 0;
+\t\t#endif
+\t}''',
+    "disable GPU-side palette lookup on Android GLES2",
+)
+
+
 # Register the TV launcher while retaining the original native activity.
 tree = ET.parse(manifest)
 root = tree.getroot()
