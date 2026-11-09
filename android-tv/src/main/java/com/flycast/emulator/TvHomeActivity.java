@@ -690,6 +690,9 @@ public final class TvHomeActivity extends Activity {
     private void launchCore(Uri uri) {
         if (uri == null) return;
         try {
+            // Apply the selected graphics profile and Mali-450 GLES2 polygon-sorting
+            // fallback before every launch, including games opened from file pickers.
+            saveFlycastSettings();
             Intent core = new Intent(this, NativeGLActivity.class);
             core.setAction(Intent.ACTION_VIEW);
             core.setDataAndType(uri, "*/*");
