@@ -50,7 +50,7 @@ public final class TvHomeActivity extends Activity {
     private static final int MAX_SCAN_DEPTH = 8;
     private static final int MAX_SCAN_FILES = 5000;
     private static final String PREFS = "dreamcast_tv_home";
-    private static final String DEFAULT_PROFILE = "balanced";
+    private static final String DEFAULT_PROFILE = "performance";
 
     private final int accent = Color.rgb(255, 190, 48);
     private final int foreground = Color.rgb(242, 245, 250);
@@ -183,8 +183,8 @@ public final class TvHomeActivity extends Activity {
         addAction(page, "ГРАФИКА И СГЛАЖИВАНИЕ",
                 "Профили производительности, разрешение до 1800p и ретро-фильтры",
                 this::buildSettingsPage, false);
-        addAction(page, "ИНТЕРФЕЙС FLYCAST",
-                "Встроенный браузер игр, настройки BIOS, управления, сохранений и VMU",
+        addAction(page, "ДОПОЛНИТЕЛЬНОЕ МЕНЮ ДВИЖКА (АНГЛИЙСКИЙ)",
+                "Служебное меню Flycast. Основная библиотека и настройки этой оболочки — на русском.",
                 this::openCoreBrowser, false);
 
         List<GameItem> games = readLibrary();
@@ -245,30 +245,30 @@ public final class TvHomeActivity extends Activity {
 
         addEyebrow(page, "НАСТРОЙКИ ВИДЕО");
         addTitle(page, "ГРАФИКА", 34);
-        addSubtitle(page, "Параметры записываются в emu.cfg и применяются к настоящему ядру Flycast.");
+        addSubtitle(page, "Все пояснения ниже на русском. Выбери режим и нажми «СОХРАНИТЬ НАСТРОЙКИ» — изменения вступят в силу при следующем запуске игры.");
 
         String profile = homePrefs().getString("profile", DEFAULT_PROFILE);
         TextView profileHeading = sectionHeading("ПРОФИЛЬ ПРОИЗВОДИТЕЛЬНОСТИ");
         page.addView(profileHeading, fullWidthWrap());
         addAction(page, profile.equals("performance") ? "✓ ПРОИЗВОДИТЕЛЬНОСТЬ" : "ПРОИЗВОДИТЕЛЬНОСТЬ",
-                "480p • минимальная нагрузка на GPU и память",
+                "480p • самый щадящий режим для слабых устройств",
                 () -> chooseProfile("performance"), false);
         addAction(page, profile.equals("balanced") ? "✓ БАЛАНС" : "БАЛАНС",
-                "720p • рекомендуемый стартовый профиль",
+                "720p • баланс чёткости и скорости",
                 () -> chooseProfile("balanced"), false);
         addAction(page, profile.equals("quality") ? "✓ КАЧЕСТВО" : "КАЧЕСТВО",
-                "1440p • высокая нагрузка; использовать при стабильной работе",
+                "1440p • повышенная чёткость, высокая нагрузка",
                 () -> chooseProfile("quality"), false);
 
         TextView resolutionHeading = sectionHeading("ВНУТРЕННЕЕ РАЗРЕШЕНИЕ / СУПЕРСЭМПЛИНГ");
         page.addView(resolutionHeading, fullWidthWrap());
-        addSubtitle(page, "Это разрешение рендеринга внутри эмулятора, а не режим HDMI-телевизора. Повышение разрешения даёт сглаживание методом supersampling, но увеличивает нагрузку.");
+        addSubtitle(page, "Это качество картинки внутри эмулятора, а не разрешение телевизора. Чем выше число, тем чётче изображение, но тем сильнее нагрузка на устройство.");
         int selectedResolution = homePrefs().getInt("resolution", profileResolution(profile));
         int[] resolutions = {480, 720, 960, 1200, 1440, 1800};
         for (int value : resolutions) {
             boolean supported = supportsResolution(value);
             String label = (value == selectedResolution ? "✓ " : "")
-                    + value + "p" + (value == 480 ? " • native" : " • supersampling");
+                    + value + "p" + (value == 480 ? " • базовый режим" : " • повышенная чёткость");
             if (value == 1800 && !supported) label += " • недоступно на этом GL-драйвере";
             final int selected = value;
             addAction(page, label,
@@ -289,7 +289,10 @@ public final class TvHomeActivity extends Activity {
                 : selectedResolution == 1440 ? "Сглаживание: supersampling x3"
                 : "Сглаживание: supersampling 3.75x";
         addInfoCard(page, aaText,
-                "Flycast использует повышенное внутреннее разрешение как supersampling. Отдельный MSAA-переключатель не показывается, потому что в этом Android-бэкенде он не предоставлен.");
+                "Сглаживание достигается повышением внутреннего разрешения. Отдельный переключатель MSAA в этой версии движка недоступен.");
+
+        addInfoCard(page, "ИСКАЖЕНИЯ И ПОЛОСЫ НА ЭКРАНЕ",
+                "Включён безопасный режим совместимости: движок сам выбирает обработку кадров и текстур. Принудительные режимы, которые могли вызывать мерцание, наложение кадров и растянутые полосы, больше не навязываются.");
 
         addInfoCard(page, "РЕТРО-ФИЛЬТРЫ",
                 "Временно отключены в этой сборке: проверяемая версия использует штатные шейдеры Flycast для надёжного запуска на GLES2. Эффекты вернутся после отдельной проверки совместимости.");
@@ -356,16 +359,18 @@ public final class TvHomeActivity extends Activity {
         int filter = homePrefs().getInt("filter", 0);
         putIniValue(lines, "config", "rend.Resolution", String.valueOf(resolution));
         putIniValue(lines, "config", "rend.VideoFilter", String.valueOf(filter));
-        putIniValue(lines, "config", "rend.ThreadedRendering", "yes");
         putIniValue(lines, "config", "rend.vsync", "yes");
         putIniValue(lines, "config", "rend.FramePacing", "yes");
         putIniValue(lines, "config", "pvr.AutoSkipFrame", "0");
         putIniValue(lines, "config", "ta.skip", "0");
         putIniValue(lines, "config", "rend.AnisotropicFiltering", String.valueOf(anisotropic));
         putIniValue(lines, "config", "rend.LinearInterpolation", "yes");
-        putIniValue(lines, "config", "rend.EmulateFramebuffer", "no");
-        putIniValue(lines, "config", "Dreamcast.Region", "3");
-        putIniValue(lines, "config", "Dreamcast.Broadcast", "4");
+        // Let Flycast choose renderer threading, framebuffer handling and region defaults.
+        // Forced overrides can cause flicker, frame overlap and broken textures on some GPUs.
+        removeIniValue(lines, "config", "rend.ThreadedRendering");
+        removeIniValue(lines, "config", "rend.EmulateFramebuffer");
+        removeIniValue(lines, "config", "Dreamcast.Region");
+        removeIniValue(lines, "config", "Dreamcast.Broadcast");
 
         AtomicFile atomicConfig = new AtomicFile(config);
         FileOutputStream out = atomicConfig.startWrite();
@@ -419,6 +424,24 @@ public final class TvHomeActivity extends Activity {
             }
         }
         lines.add(sectionEnd, key + " = " + value);
+    }
+
+    private void removeIniValue(List<String> lines, String section, String key) {
+        String header = "[" + section + "]";
+        boolean inSection = false;
+        for (int i = lines.size() - 1; i >= 0; i--) {
+            String trimmed = lines.get(i).trim();
+            if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
+                inSection = trimmed.equalsIgnoreCase(header);
+                continue;
+            }
+            if (inSection) {
+                int equal = lines.get(i).indexOf('=');
+                if (equal > 0 && lines.get(i).substring(0, equal).trim().equalsIgnoreCase(key)) {
+                    lines.remove(i);
+                }
+            }
+        }
     }
 
     private File getFlycastHome() {
