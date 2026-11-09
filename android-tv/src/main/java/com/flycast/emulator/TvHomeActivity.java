@@ -291,28 +291,8 @@ public final class TvHomeActivity extends Activity {
         addInfoCard(page, aaText,
                 "Flycast использует повышенное внутреннее разрешение как supersampling. Отдельный MSAA-переключатель не показывается, потому что в этом Android-бэкенде он не предоставлен.");
 
-        TextView filterHeading = sectionHeading("РЕТРО-ФИЛЬТРЫ");
-        page.addView(filterHeading, fullWidthWrap());
-        addSubtitle(page, "Фильтр применяется к финальному кадру OpenGL. Можно выбрать один эффект или выключить.");
-        String[] filterNames = {"ВЫКЛЮЧЕН", "CRT", "СТАРЫЙ ТЕЛЕВИЗОР", "COMPOSITE", "RGB MASK", "VHS"};
-        String[] filterDescriptions = {
-                "Оригинальная картинка без дополнительного эффекта",
-                "Эффект ЭЛТ: сканирующие линии и лёгкое затемнение краёв",
-                "Мягкая аналоговая картинка с оттенком и линиями",
-                "Композитный видеосигнал с лёгким цветовым смешением",
-                "RGB-сетка субпикселей",
-                "VHS: цветовое смещение и аналоговые полосы"
-        };
-        int filter = homePrefs().getInt("filter", 0);
-        for (int i = 0; i < filterNames.length; i++) {
-            final int selected = i;
-            addAction(page, (filter == i ? "✓ " : "") + filterNames[i],
-                    filterDescriptions[i],
-                    () -> {
-                        homePrefs().edit().putInt("filter", selected).apply();
-                        buildSettingsPage();
-                    }, false);
-        }
+        addInfoCard(page, "РЕТРО-ФИЛЬТРЫ",
+                "Временно отключены в этой сборке: проверяемая версия использует штатные шейдеры Flycast для надёжного запуска на GLES2. Эффекты вернутся после отдельной проверки совместимости.");
 
         addInfoCard(page, "АВТОРЕЖИМ PAL / NTSC",
                 "Регион и частота не фиксируются. Выставлен режим Flycast Default, чтобы игра использовала свой регион и родную частоту 50/60 Гц. Искусственное ограничение до 30 FPS не включается.");
