@@ -31,12 +31,14 @@ jobs:
           distribution: temurin
           java-version: "17"
 
-      - name: Set up Android SDK
+      - name: Set up Android command-line tools
         uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools"
 
       - name: Install pinned Android build components
         run: |
-          sdkmanager "platform-tools" "platforms;android-36" "ndk;29.0.14206865" "cmake;3.22.1"
+          sdkmanager "platforms;android-36" "ndk;29.0.14206865" "cmake;3.22.1"
 
       - name: Apply Android TV launcher
         run: python3 android-tv/apply-tv-shell.py
