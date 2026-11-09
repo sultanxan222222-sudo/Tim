@@ -500,9 +500,7 @@ public final class TvHomeActivity extends Activity {
                         | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
                 getContentResolver().takePersistableUriPermission(treeUri, flags);
             } catch (SecurityException ignored) { }
-            int found = scanFolder(treeUri);
-            toast(found > 0 ? "Добавлено игр: " + found : "Совместимые игры не найдены.");
-            buildLibraryPage();
+            scanFolder(treeUri);
         } else if (requestCode == REQUEST_PICK_COVER && data.getData() != null
                 && coverTargetUri != null) {
             homePrefs().edit().putString("cover_" + coverTargetUri, data.getData().toString()).apply();
@@ -511,16 +509,30 @@ public final class TvHomeActivity extends Activity {
         }
     }
 
-    private int scanFolder(Uri treeUri) {
-        DocumentFile root = DocumentFile.fromTreeUri(this, treeUri);
-        if (root == null || !root.isDirectory()) return 0;
-        List<GameItem> found = new ArrayList<>();
-        scanDirectory(root, 0, found);
-        int added = 0;
-        for (GameItem item : found) {
-            if (rememberGame(item.uri, item.name)) added++;
-        }
-        return added;
+    private void scanFolder(Uri treeUri) {
+        toast("Сканирую папку с играми…");
+        Thread scanner = new Thread(() -> {
+            int added = 0;
+            try {
+                DocumentFile root = DocumentFile.fromTreeUri(this, treeUri);
+                if (root != null && root.isDirectory()) {
+                    List<GameItem> found = new ArrayList<>();
+                    scanDirectory(root, 0, found);
+                    added = rememberGames(found);
+                }
+            } catch (Throwable ignored) {
+                // A removable-storage provider may disappear or revoke access during scanning.
+            }
+            final int totalAdded = added;
+            runOnUiThread(() -> {
+                toast(totalAdded > 0
+                        ? "Добавлено игр: " + totalAdded
+                        : "Совместимые игры не найдены или папка недоступна.");
+                buildLibraryPage();
+            });
+        }, "DreamcastLibraryScan");
+        scanner.setDaemon(true);
+        scanner.start();
     }
 
     private void scanDirectory(DocumentFile directory, int depth, List<GameItem> found) {
@@ -557,18 +569,31 @@ public final class TvHomeActivity extends Activity {
 
     private boolean rememberGame(String uri, String name) {
         if (uri == null || uri.trim().isEmpty()) return false;
-        List<GameItem> old = readLibrary();
-        List<GameItem> next = new ArrayList<>();
-        boolean exists = false;
-        for (GameItem item : old) {
-            if (item.uri.equals(uri)) {
-                exists = true;
-                continue;
-            }
-            if (next.size() < MAX_LIBRARY - 1) next.add(item);
-        }
-        next.add(0, new GameItem(uri, (name == null || name.trim().isEmpty())
+        List<GameItem> incoming = new ArrayList<>();
+        incoming.add(new GameItem(uri, (name == null || name.trim().isEmpty())
                 ? "Игра Dreamcast" : name));
+        return rememberGames(incoming) > 0;
+    }
+
+    private int rememberGames(List<GameItem> incoming) {
+        List<GameItem> previous = readLibrary();
+        List<GameItem> next = new ArrayList<>();
+        java.util.HashSet<String> seen = new java.util.HashSet<>();
+        int added = 0;
+
+        // New scan results go first; remove duplicates and preserve existing order after them.
+        for (GameItem item : incoming) {
+            if (item == null || item.uri == null || item.uri.trim().isEmpty()) continue;
+            if (seen.add(item.uri)) {
+                if (previous.stream().noneMatch(old -> old.uri.equals(item.uri))) added++;
+                if (next.size() < MAX_LIBRARY) next.add(item);
+            }
+        }
+        for (GameItem item : previous) {
+            if (next.size() >= MAX_LIBRARY) break;
+            if (seen.add(item.uri)) next.add(item);
+        }
+
         SharedPreferences.Editor editor = homePrefs().edit();
         for (int i = 0; i < MAX_LIBRARY; i++) {
             if (i < next.size()) {
@@ -580,7 +605,7 @@ public final class TvHomeActivity extends Activity {
             }
         }
         editor.putInt("game_count", next.size()).apply();
-        return !exists;
+        return added;
     }
 
     private List<GameItem> readLibrary() {
