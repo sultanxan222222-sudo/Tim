@@ -19,6 +19,7 @@ jobs:
   flycast-android:
     name: Build Android TV Flycast APK
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
     steps:
       - name: Checkout repository and pinned Flycast submodule
         uses: actions/checkout@v4
@@ -40,14 +41,17 @@ jobs:
         run: |
           sdkmanager "platforms;android-36" "ndk;29.0.14206865" "cmake;3.22.1"
 
-      - name: Apply Android TV launcher
-        run: python3 android-tv/apply-tv-shell.py
+      - name: Validate Android TV patch script
+        run: |
+          python3 -m py_compile android-tv/apply-tv-shell.py
+          python3 android-tv/apply-tv-shell.py 2>&1 | tee "$RUNNER_TEMP/tv-apply.log"
 
       - name: Build installable debug APK
         working-directory: third_party/flycast/shell/android-studio
         run: |
+          set -o pipefail
           chmod +x ./gradlew
-          ./gradlew --no-daemon :flycast:assembleDebug
+          ./gradlew --no-daemon :flycast:assembleDebug 2>&1 | tee "$RUNNER_TEMP/gradle-build.log"
 
       - name: Inspect APK output
         run: |
@@ -55,6 +59,7 @@ jobs:
           test -n "$APK"
           echo "APK_PATH=$APK" >> "$GITHUB_ENV"
           ls -lh "$APK"
+          unzip -t "$APK" | tail -n 2
 
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
@@ -63,3 +68,14 @@ jobs:
           path: ${{ env.APK_PATH }}
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload build diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dreamcast-android-tv-build-logs
+          path: |
+            ${{ runner.temp }}/tv-apply.log
+            ${{ runner.temp }}/gradle-build.log
+          if-no-files-found: warn
+          retention-days: 14
