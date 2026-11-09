@@ -175,8 +175,8 @@ public final class TvHomeActivity extends Activity {
         addAction(page, "ГРАФИКА И СГЛАЖИВАНИЕ",
                 "Профили производительности, разрешение до 1800p и ретро-фильтры",
                 this::buildSettingsPage, false);
-        addAction(page, "СОХРАНЕНИЯ И VMU",
-                "Открыть настоящий интерфейс Flycast для сохранений и карт памяти",
+        addAction(page, "ИНТЕРФЕЙС FLYCAST",
+                "Встроенный браузер игр, настройки BIOS, управления, сохранений и VMU",
                 this::openCoreBrowser, false);
 
         List<GameItem> games = readLibrary();
@@ -478,8 +478,13 @@ public final class TvHomeActivity extends Activity {
 
         if (requestCode == REQUEST_PICK_GAME) {
             if (data.getClipData() != null) {
+                int readFlags = data.getFlags() & Intent.FLAG_GRANT_READ_URI_PERMISSION;
                 for (int i = 0; i < data.getClipData().getItemCount(); i++) {
                     Uri uri = data.getClipData().getItemAt(i).getUri();
+                    try {
+                        if (readFlags != 0)
+                            getContentResolver().takePersistableUriPermission(uri, readFlags);
+                    } catch (SecurityException ignored) { }
                     rememberGame(uri, queryDisplayName(uri));
                 }
                 buildLibraryPage();
