@@ -9,16 +9,9 @@ import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
 import android.graphics.drawable.StateListDrawable;
 import android.net.Uri;
-import android.opengl.EGL14;
-import android.opengl.EGLConfig;
-import android.opengl.EGLContext;
-import android.opengl.EGLDisplay;
-import android.opengl.EGLSurface;
-import android.opengl.GLES20;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.view.Gravity;
-import android.view.View;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -27,26 +20,19 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-/** TV-first launcher and real Flycast settings front-end. */
+/** TV-first launcher connected to the real Flycast Android activity. */
 public final class TvHomeActivity extends Activity {
     private static final int REQUEST_PICK_GAME = 4101;
     private static final String PREFS = "dreamcast_tv_home";
     private static final int MAX_RECENTS = 5;
-    private static final int[] RENDER_HEIGHTS = {480, 720, 960, 1200, 1440, 1800};
-    private static final String[] FILTER_NAMES = {
-            "Выключен", "CRT 90-х", "Старый телевизор",
-            "Composite", "RGB-маска", "VHS"
-    };
 
     private final int accent = Color.rgb(255, 190, 48);
     private final int foreground = Color.rgb(242, 245, 250);
     private final int muted = Color.rgb(160, 172, 190);
-    private int maxRenderTarget = 0;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        maxRenderTarget = queryMaxRenderTarget();
         Intent launchIntent = getIntent();
         if (launchIntent != null && Intent.ACTION_VIEW.equals(launchIntent.getAction())
                 && launchIntent.getData() != null) {
@@ -58,12 +44,12 @@ public final class TvHomeActivity extends Activity {
         }
 
         getWindow().getDecorView().setSystemUiVisibility(
-                View.SYSTEM_UI_FLAG_FULLSCREEN
-                        | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
-                        | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
-                        | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
-                        | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
+                android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                        | android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                        | android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN);
         buildHome();
     }
 
@@ -101,29 +87,40 @@ public final class TvHomeActivity extends Activity {
         page.addView(subtitle, fullWidthWrap());
 
         addAction(page, "ВЫБРАТЬ ИГРУ",
-                "Открыть образ игры из памяти приставки или USB-накопителя",
-                this::pickGame, true);
+                "Открыть игру из памяти приставки или USB-накопителя", this::pickGame, true);
 
         List<RecentGame> recents = readRecents();
         if (!recents.isEmpty()) {
-            addSectionTitle(page, "НЕДАВНИЕ ИГРЫ");
+            TextView recentHeading = new TextView(this);
+            recentHeading.setText("НЕДАВНИЕ ИГРЫ");
+            recentHeading.setTextColor(accent);
+            recentHeading.setTextSize(13);
+            recentHeading.setTypeface(Typeface.DEFAULT_BOLD);
+            recentHeading.setLetterSpacing(0.1f);
+            recentHeading.setPadding(0, dp(22), 0, dp(8));
+            page.addView(recentHeading, fullWidthWrap());
+
             for (RecentGame game : recents) {
                 addAction(page, game.name, "Запустить игру",
                         () -> launchCore(Uri.parse(game.uri)), false);
             }
         }
 
-        addSectionTitle(page, "ГРАФИКА");
-        addGraphicsSettings(page);
+        TextView coreHeading = new TextView(this);
+        coreHeading.setText("ИНТЕРФЕЙС ЭМУЛЯТОРА");
+        coreHeading.setTextColor(accent);
+        coreHeading.setTextSize(13);
+        coreHeading.setTypeface(Typeface.DEFAULT_BOLD);
+        coreHeading.setLetterSpacing(0.1f);
+        coreHeading.setPadding(0, dp(22), 0, dp(8));
+        page.addView(coreHeading, fullWidthWrap());
 
-        addSectionTitle(page, "БИБЛИОТЕКА И СОХРАНЕНИЯ");
         addAction(page, "Открыть Flycast",
-                "Встроенная библиотека, добавление папок, настройки ядра, VMU и состояния сохранения",
+                "Встроенная библиотека, настройки ядра и управление сохранениями",
                 this::openCoreBrowser, false);
 
         TextView footer = new TextView(this);
-        footer.setText("Игры и BIOS не входят в приложение. Используйте собственные файлы. "
-                + "Настройки графики применяются к ядру Flycast при запуске.");
+        footer.setText("Игры и BIOS не входят в приложение. Используйте собственные файлы.");
         footer.setTextColor(muted);
         footer.setTextSize(13);
         footer.setGravity(Gravity.CENTER);
@@ -134,70 +131,6 @@ public final class TvHomeActivity extends Activity {
         setContentView(scroll);
         page.setFocusableInTouchMode(true);
         page.requestFocus();
-    }
-
-    private void addGraphicsSettings(LinearLayout page) {
-        SharedPreferences prefs = getSharedPreferences(PREFS, MODE_PRIVATE);
-        int profile = clamp(prefs.getInt("tv_graphics_profile", 1), 0, 2);
-        int renderHeight = supportedRenderHeight(prefs.getInt("tv_render_height", 720));
-        int filter = clamp(prefs.getInt("tv_retro_filter", 0), 0, FILTER_NAMES.length - 1);
-
-        addAction(page, (profile == 0 ? "✓ " : "") + "ПРОИЗВОДИТЕЛЬНОСТЬ",
-                "480p, адаптивный пропуск кадров при нагрузке, лёгкая фильтрация текстур",
-                () -> selectProfile(0), profile == 0);
-        addAction(page, (profile == 1 ? "✓ " : "") + "БАЛАНС",
-                "720p, адаптивный пропуск кадров, умеренная фильтрация текстур",
-                () -> selectProfile(1), profile == 1);
-        addAction(page, (profile == 2 ? "✓ " : "") + "КАЧЕСТВО",
-                "960p, без автоматического пропуска кадров, более чёткие наклонные текстуры",
-                () -> selectProfile(2), profile == 2);
-
-        addSectionTitle(page, "ВНУТРЕННЕЕ РАЗРЕШЕНИЕ");
-        for (int height : RENDER_HEIGHTS) {
-            if (!isRenderHeightSupported(height)) continue;
-            final int selectedHeight = height;
-            String detail = height == 480 ? "Стандартное разрешение Dreamcast"
-                    : "Внутренний рендер " + height + "p; выше чёткость, выше нагрузка на GPU";
-            addAction(page, (renderHeight == height ? "✓ " : "") + height + "p",
-                    detail, () -> selectRenderHeight(selectedHeight), renderHeight == height);
-        }
-
-        addSectionTitle(page, "РЕТРО-ФИЛЬТРЫ · ОДИН ОДНОВРЕМЕННО");
-        for (int i = 0; i < FILTER_NAMES.length; i++) {
-            final int selectedFilter = i;
-            String detail;
-            switch (i) {
-                case 1: detail = "Лёгкие электронно-лучевые строки и затемнение по краям"; break;
-                case 2: detail = "Мягкая картинка и горизонтальная развертка старого ТВ"; break;
-                case 3: detail = "Мягкость и лёгкое цветовое смешение композитного сигнала"; break;
-                case 4: detail = "RGB-субпиксельная маска экрана"; break;
-                case 5: detail = "Лёгкое цветовое смещение и горизонтальная нестабильность VHS"; break;
-                default: detail = "Чистое изображение без дополнительной обработки"; break;
-            }
-            addAction(page, (filter == i ? "✓ " : "") + FILTER_NAMES[i],
-                    detail, () -> selectRetroFilter(selectedFilter), filter == i);
-        }
-
-        TextView note = new TextView(this);
-        note.setText("Сглаживание достигается повышением внутреннего разрешения (supersampling). "
-                + "1800p показывается только тогда, когда графический драйвер сообщает подходящий "
-                + "размер текстуры и буфера. Даже при поддержке драйвером такой режим может быть "
-                + "тяжёлым для RK3528; при рывках выберите 720p или 960p.");
-        note.setTextColor(muted);
-        note.setTextSize(13);
-        note.setPadding(0, dp(8), 0, dp(14));
-        page.addView(note, fullWidthWrap());
-    }
-
-    private void addSectionTitle(LinearLayout page, String label) {
-        TextView heading = new TextView(this);
-        heading.setText(label);
-        heading.setTextColor(accent);
-        heading.setTextSize(13);
-        heading.setTypeface(Typeface.DEFAULT_BOLD);
-        heading.setLetterSpacing(0.1f);
-        heading.setPadding(0, dp(22), 0, dp(8));
-        page.addView(heading, fullWidthWrap());
     }
 
     private void addAction(LinearLayout parent, String title, String description,
@@ -248,103 +181,6 @@ public final class TvHomeActivity extends Activity {
         drawable.setCornerRadius(dp(12));
         if (stroke != 0) drawable.setStroke(dp(2), stroke);
         return drawable;
-    }
-
-    private void selectProfile(int profile) {
-        int resolution = profile == 0 ? 480 : profile == 1 ? 720 : 960;
-        if (!isRenderHeightSupported(resolution)) resolution = 480;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putInt("tv_graphics_profile", profile)
-                .putInt("tv_render_height", resolution)
-                .apply();
-        buildHome();
-    }
-
-    private void selectRenderHeight(int height) {
-        if (!isRenderHeightSupported(height)) return;
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putInt("tv_render_height", height)
-                .apply();
-        buildHome();
-    }
-
-    private void selectRetroFilter(int filter) {
-        getSharedPreferences(PREFS, MODE_PRIVATE).edit()
-                .putInt("tv_retro_filter", clamp(filter, 0, FILTER_NAMES.length - 1))
-                .apply();
-        buildHome();
-    }
-
-    private boolean isRenderHeightSupported(int height) {
-        if (maxRenderTarget <= 0) return height <= 720;
-        int requiredWidth = (int) Math.ceil(height * 16.0 / 9.0);
-        return height <= maxRenderTarget && requiredWidth <= maxRenderTarget;
-    }
-
-    private int supportedRenderHeight(int requested) {
-        for (int height : RENDER_HEIGHTS) {
-            if (height == requested && isRenderHeightSupported(height)) return height;
-        }
-        return 480;
-    }
-
-    private int queryMaxRenderTarget() {
-        EGLDisplay display = EGL14.EGL_NO_DISPLAY;
-        EGLContext context = EGL14.EGL_NO_CONTEXT;
-        EGLSurface surface = EGL14.EGL_NO_SURFACE;
-        boolean initialized = false;
-        try {
-            display = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
-            if (display == EGL14.EGL_NO_DISPLAY) return 0;
-            int[] versions = new int[2];
-            if (!EGL14.eglInitialize(display, versions, 0, versions, 1)) return 0;
-            initialized = true;
-
-            int[] configAttrs = {
-                    EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-                    EGL14.EGL_RED_SIZE, 8, EGL14.EGL_GREEN_SIZE, 8,
-                    EGL14.EGL_BLUE_SIZE, 8, EGL14.EGL_ALPHA_SIZE, 8,
-                    EGL14.EGL_NONE
-            };
-            EGLConfig[] configs = new EGLConfig[1];
-            int[] count = new int[1];
-            if (!EGL14.eglChooseConfig(display, configAttrs, 0, configs, 0, 1, count, 0)
-                    || count[0] == 0) return 0;
-
-            int[] contextAttrs = {EGL14.EGL_CONTEXT_CLIENT_VERSION, 2, EGL14.EGL_NONE};
-            context = EGL14.eglCreateContext(display, configs[0], EGL14.EGL_NO_CONTEXT,
-                    contextAttrs, 0);
-            if (context == EGL14.EGL_NO_CONTEXT) return 0;
-
-            int[] surfaceAttrs = {
-                    EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE
-            };
-            surface = EGL14.eglCreatePbufferSurface(display, configs[0], surfaceAttrs, 0);
-            if (surface == EGL14.EGL_NO_SURFACE) return 0;
-            if (!EGL14.eglMakeCurrent(display, surface, surface, context)) return 0;
-
-            int[] textureLimit = new int[1];
-            int[] renderbufferLimit = new int[1];
-            GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, textureLimit, 0);
-            GLES20.glGetIntegerv(GLES20.GL_MAX_RENDERBUFFER_SIZE, renderbufferLimit, 0);
-            return Math.min(textureLimit[0], renderbufferLimit[0]);
-        } catch (Throwable ignored) {
-            return 0;
-        } finally {
-            if (display != EGL14.EGL_NO_DISPLAY) {
-                EGL14.eglMakeCurrent(display, EGL14.EGL_NO_SURFACE,
-                        EGL14.EGL_NO_SURFACE, EGL14.EGL_NO_CONTEXT);
-                if (surface != EGL14.EGL_NO_SURFACE)
-                    EGL14.eglDestroySurface(display, surface);
-                if (context != EGL14.EGL_NO_CONTEXT)
-                    EGL14.eglDestroyContext(display, context);
-                if (initialized) EGL14.eglTerminate(display);
-            }
-        }
-    }
-
-    private static int clamp(int value, int min, int max) {
-        return Math.max(min, Math.min(max, value));
     }
 
     private void pickGame() {
