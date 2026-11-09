@@ -99,6 +99,57 @@ replace_once(
 )
 
 
+# Mali-450 GLES2 geometry workaround: orphan the streaming vertex/index buffer
+# storage before every frame upload. The GLES2 renderer reuses VBO/IBO objects
+# with glBufferSubData; some Mali-450 drivers can mishandle writes to storage
+# that may still be consumed by queued draws. Re-specifying the store detaches
+# the previous frame's storage without changing shaders or menu settings.
+gles_header = CORE / "core" / "rend" / "gles" / "gles.h"
+replace_once(
+    gles_header,
+    '''\tvoid update(const void *data, GLsizeiptr size)
+\t{
+\t\tbind();
+\t\tif (size > this->size)
+\t\t{
+\t\t\tglBufferData(type, size, data, usage);
+\t\t\tthis->size = size;
+\t\t}
+\t\telse
+\t\t{
+\t\t\tglBufferSubData(type, 0, size, data);
+\t\t}
+\t}''',
+    '''\tvoid update(const void *data, GLsizeiptr size)
+\t{
+\t\tbind();
+\t\t#if defined(__ANDROID__) && defined(GLES2)
+\t\t// Orphan dynamic geometry/index storage before uploading this frame.
+\t\t// This avoids reusing a Mali-450 GLES2 buffer store that a queued draw
+\t\t// from the previous frame may still be reading.
+\t\tif (usage == GL_STREAM_DRAW)
+\t\t{
+\t\t\tglBufferData(type, size, nullptr, usage);
+\t\t\tif (size > 0)
+\t\t\t\tglBufferSubData(type, 0, size, data);
+\t\t\tthis->size = size;
+\t\t\treturn;
+\t\t}
+\t\t#endif
+\t\tif (size > this->size)
+\t\t{
+\t\t\tglBufferData(type, size, data, usage);
+\t\t\tthis->size = size;
+\t\t}
+\t\telse
+\t\t{
+\t\t\tglBufferSubData(type, 0, size, data);
+\t\t}
+\t}''',
+    "orphan GLES2 Mali streaming geometry/index buffers per frame",
+)
+
+
 # Register the TV launcher while retaining the original native activity.
 tree = ET.parse(manifest)
 root = tree.getroot()
