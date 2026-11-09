@@ -115,6 +115,17 @@ replace_once(
     "native Flycast settings reload",
 )
 
+# This Android TV target is deliberately GLES2/OpenGL-only. Upstream's Android
+# JNI source list compiles the Vulkan frame-pacing bridge unconditionally; that
+# bridge includes Vulkan-Hpp even when USE_VULKAN=OFF. Exclude it from this build.
+android_jni_cmake = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "jni" / "src" / "CMakeLists.txt"
+replace_once(
+    android_jni_cmake,
+    '\t\tswappygl.cpp\n\t\tswappyvk.cpp)',
+    '\t\tswappygl.cpp)',
+    "exclude Vulkan-only Android frame-pacing bridge from GLES2 build",
+)
+
 # The RK3528 Mali-450 target is OpenGL ES 2.0 class. Upstream's generic
 # Android CMake default selects the ES3 shader path; build an explicit ES2
 # renderer and ES2 ImGui backend so the app can run on this target.
