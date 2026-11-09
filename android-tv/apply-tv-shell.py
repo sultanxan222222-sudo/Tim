@@ -121,13 +121,15 @@ replace_once(
 cmake_root = CORE / "CMakeLists.txt"
 replace_once(
     cmake_root,
-    'target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)',
-    '''if(USE_GLES2)
+    'if(ANDROID)\n\t\ttarget_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)\n\t\tadd_subdirectory(shell/android-studio/flycast/src/main/jni/src)',
+    '''if(ANDROID)
+        if(USE_GLES2)
             target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES2 IMGUI_IMPL_OPENGL_ES2)
         else()
             target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)
-        endif()''',
-    "select GLES2 for RK3528 when requested",
+        endif()
+        add_subdirectory(shell/android-studio/flycast/src/main/jni/src)''',
+    "select GLES2 for RK3528 in the Android native target",
 )
 gradle_file = CORE / "shell" / "android-studio" / "flycast" / "build.gradle.kts"
 replace_once(
