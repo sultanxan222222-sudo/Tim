@@ -1,0 +1,53 @@
+name: Android TV Dreamcast baseline
+
+on:
+  push:
+    branches: [android-tv-dreamcast]
+    paths:
+      - ".github/workflows/android-tv-build.yml"
+      - ".gitmodules"
+      - "third_party/flycast"
+      - "android-tv/**"
+  pull_request:
+    branches: [android-tv-dreamcast]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  flycast-android-baseline:
+    name: Build pinned Flycast Android baseline
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout repository and Flycast submodule
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install pinned Android build components
+        run: |
+          sdkmanager "platform-tools" "platforms;android-36" "ndk;29.0.14206865" "cmake;3.22.1"
+
+      - name: Build Flycast Android debug APK
+        working-directory: third_party/flycast/shell/android-studio
+        run: |
+          chmod +x ./gradlew
+          ./gradlew --no-daemon :flycast:assembleDebug
+
+      - name: Upload baseline APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: flycast-android-baseline
+          path: third_party/flycast/shell/android-studio/flycast/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
+          retention-days: 14
