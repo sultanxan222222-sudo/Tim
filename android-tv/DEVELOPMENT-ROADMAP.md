@@ -1,45 +1,40 @@
 # Development roadmap
 
-Each stage must produce a reviewable result before the next stage depends on it.
+## Repository and baseline
+- [x] Isolated `android-tv-dreamcast` branch.
+- [x] Pin upstream Flycast as a submodule.
+- [x] Add Android TV launcher source and patch application script.
+- [x] Add CI workflow to build and upload an installable APK.
+- [ ] Confirm CI build and inspect resulting APK.
 
-## Stage 0 — Repository and upstream baseline
-- [x] Create isolated `android-tv-dreamcast` branch from the PS4 Dreamcast work.
-- [x] Pin Flycast upstream as a submodule.
-- [x] Add CI build of the upstream Android baseline APK.
-- [ ] Confirm the CI build succeeds and record the exact artifact/commit.
+## TV shell
+- [x] Russian TV-first launcher, readable from a distance.
+- [x] D-pad focusable controls.
+- [x] SAF game picker and recent-game shortcuts.
+- [ ] Test navigation and storage providers on the actual RK3528 box.
+- [ ] Finish custom TV game-library presentation and artwork.
 
-## Stage 1 — App shell
-- [ ] Create the branded Android TV application shell and Russian localization.
-- [ ] Verify focus navigation with D-pad, remote and connected gamepad.
-- [ ] Confirm Android 13/14 launch behavior and Leanback launcher visibility.
-- [ ] Preserve the ability to enter the actual Flycast game session.
+## Core and storage
+- [x] Reuse the pinned Flycast Android application and native engine.
+- [ ] Verify direct game launch for GDI/CHD/CDI/CUE and other supported formats.
+- [ ] Verify removable USB storage and persistable document URI grants.
+- [ ] Verify VMU and save-state behavior.
 
-## Stage 2 — Core adapter and library
-- [ ] Wrap the existing Flycast Android APIs behind GameSession/EngineCapabilities contracts.
-- [ ] Add library scanning through SAF and removable USB storage.
-- [ ] Verify supported disc/image formats and save-state/VMU handling.
-- [ ] Add error handling for missing files and inaccessible removable storage.
+## Graphics and timing
+- [ ] Query actual renderer capabilities at runtime.
+- [ ] Implement Performance/Balanced/Quality presets through real Flycast settings.
+- [ ] Offer render sizes up to 1800p only within reported limits.
+- [ ] Add only actual backend-supported anti-aliasing modes.
+- [ ] Preserve native PAL/NTSC timing and emulated speed.
 
-## Stage 3 — Graphics and timing
-- [ ] Query real backend capabilities before showing settings.
-- [ ] Implement Performance/Balanced/Quality presets using real engine options.
-- [ ] Add resolution choices up to 1800p only when valid render-target limits allow them.
-- [ ] Add only those AA modes that the selected backend truly supports.
-- [ ] Verify PAL/NTSC and game-native timing; preserve emulated speed.
+## Optional retro effects
+- [ ] One-choice retro filter selector, default Off.
+- [ ] Implement and measure each shader on the target GPU.
+- [ ] Keep filters independent from render scale, AA and timing.
+- [ ] Hide unsupported filters.
 
-## Stage 4 — Optional retro filters
-- [ ] Add a one-choice filter menu, default Off.
-- [ ] Implement and measure each filter independently.
-- [ ] Ensure changing filters never silently changes core graphics or timing options.
-- [ ] Hide filters that are unsupported by the active backend.
-
-## Stage 5 — Release readiness
-- [ ] Run automated tests and produce a signed/reproducible debug or release APK.
-- [ ] Inspect APK ABI, manifest, target SDK, native libraries and permissions.
-- [ ] Install and test on the actual RK3528 Android TV box.
-- [ ] Measure stability, frame pacing, GPU load, memory and thermals over extended play.
-- [ ] Publish the installable APK only after the device test passes.
-
-## Acceptance rule
-
-A green host/CI build proves that the checked code compiles. It does not prove that the emulator runs correctly on the user's box. The final status must distinguish CI success from real-device validation.
+## Release validation
+- [ ] CI build green; APK inspected for manifest, ABI and dependencies.
+- [ ] Install and launch on Android 13/14 device.
+- [ ] Extended game-play test on RK3528, including frame pacing, memory and thermal checks.
+- [ ] Publish the APK only after build validation; clearly distinguish CI from on-device validation.

@@ -16,11 +16,11 @@ permissions:
   contents: read
 
 jobs:
-  flycast-android-baseline:
-    name: Build pinned Flycast Android baseline
+  flycast-android:
+    name: Build Android TV Flycast APK
     runs-on: ubuntu-24.04
     steps:
-      - name: Checkout repository and Flycast submodule
+      - name: Checkout repository and pinned Flycast submodule
         uses: actions/checkout@v4
         with:
           submodules: recursive
@@ -38,16 +38,26 @@ jobs:
         run: |
           sdkmanager "platform-tools" "platforms;android-36" "ndk;29.0.14206865" "cmake;3.22.1"
 
-      - name: Build Flycast Android debug APK
+      - name: Apply Android TV launcher
+        run: python3 android-tv/apply-tv-shell.py
+
+      - name: Build installable debug APK
         working-directory: third_party/flycast/shell/android-studio
         run: |
           chmod +x ./gradlew
           ./gradlew --no-daemon :flycast:assembleDebug
 
-      - name: Upload baseline APK
+      - name: Inspect APK output
+        run: |
+          APK=$(find third_party/flycast/shell/android-studio/flycast/build/outputs/apk/debug -maxdepth 1 -name '*.apk' -print -quit)
+          test -n "$APK"
+          echo "APK_PATH=$APK" >> "$GITHUB_ENV"
+          ls -lh "$APK"
+
+      - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: flycast-android-baseline
-          path: third_party/flycast/shell/android-studio/flycast/build/outputs/apk/debug/*.apk
+          name: dreamcast-android-tv-apk
+          path: ${{ env.APK_PATH }}
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
