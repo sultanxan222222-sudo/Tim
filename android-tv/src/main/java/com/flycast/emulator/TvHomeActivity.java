@@ -838,11 +838,14 @@ public final class TvHomeActivity extends Activity {
 
     private void focusFirst(LinearLayout page) {
         page.setFocusableInTouchMode(true);
-        page.requestFocus();
-        if (page.getChildCount() > 0) {
-            View first = page.getChildAt(1);
-            if (first != null) first.requestFocus();
+        for (int i = 0; i < page.getChildCount(); i++) {
+            View child = page.getChildAt(i);
+            if (child != null && child.isFocusable() && child.isEnabled()
+                    && child.getVisibility() == View.VISIBLE) {
+                if (child.requestFocus()) return;
+            }
         }
+        page.requestFocus();
     }
 
     private LinearLayout.LayoutParams fullWidthWrap() {
