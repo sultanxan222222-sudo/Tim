@@ -579,14 +579,16 @@ public final class TvHomeActivity extends Activity {
         List<GameItem> previous = readLibrary();
         List<GameItem> next = new ArrayList<>();
         java.util.HashSet<String> seen = new java.util.HashSet<>();
+        java.util.HashSet<String> existing = new java.util.HashSet<>();
+        for (GameItem item : previous) existing.add(item.uri);
         int added = 0;
 
         // New scan results go first; remove duplicates and preserve existing order after them.
         for (GameItem item : incoming) {
             if (item == null || item.uri == null || item.uri.trim().isEmpty()) continue;
-            if (seen.add(item.uri)) {
-                if (previous.stream().noneMatch(old -> old.uri.equals(item.uri))) added++;
-                if (next.size() < MAX_LIBRARY) next.add(item);
+            if (seen.add(item.uri) && next.size() < MAX_LIBRARY) {
+                next.add(item);
+                if (!existing.contains(item.uri)) added++;
             }
         }
         for (GameItem item : previous) {
