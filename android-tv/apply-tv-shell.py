@@ -139,6 +139,14 @@ replace_once(
     '                arguments += "-DUSE_VULKAN=OFF"\n',
     "configure the Android TV build for the RK3528 GLES2 GPU",
 )
+replace_once(
+    gradle_file,
+    '        minSdk = 21\n        targetSdk = 36\n',
+    '        minSdk = 21\n'
+    '        targetSdk = 36\n'
+    '        ndk { abiFilters += setOf("arm64-v8a", "armeabi-v7a") }\n',
+    "package both 64-bit and 32-bit ARM TV boxes",
+)
 
 # Add a lightweight post-process pass to Flycast's final GLES presentation quad.
 quad_h = CORE / "core" / "rend" / "gles" / "quad.h"
