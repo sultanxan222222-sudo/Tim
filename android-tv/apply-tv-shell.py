@@ -78,19 +78,6 @@ ET.indent(tree, space="    ")
 tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
 # Expose one Flycast-owned option for the actual OpenGL post-process shader.
-replace_once(
-    CORE / "core" / "cfg" / "option.h",
-    'extern Option<int> RenderResolution;\n',
-    'extern Option<int> RenderResolution;\nextern Option<int> VideoFilter;\n',
-    "VideoFilter option declaration",
-)
-replace_once(
-    CORE / "core" / "cfg" / "option.cpp",
-    'Option<int> RenderResolution("rend.Resolution", 480);\n',
-    'Option<int> RenderResolution("rend.Resolution", 480);\nOption<int> VideoFilter("rend.VideoFilter", 0);\n',
-    "VideoFilter option definition",
-)
-
 # Reload emu.cfg whenever the TV frontend launches the native activity. This makes
 # changed profile/filter values take effect even if Android kept the Application alive.
 jni_java = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "java" / "com" / "flycast" / "emulator" / "emu" / "JNIdc.java"
@@ -161,125 +148,9 @@ replace_once(
     "package both 64-bit and 32-bit ARM TV boxes",
 )
 
-# Add a lightweight post-process pass to Flycast's final GLES presentation quad.
-quad_h = CORE / "core" / "rend" / "gles" / "quad.h"
-replace_once(
-    quad_h,
-    'void draw(GLuint texId, bool rotate = false, bool swapY = false, const float *coords = nullptr, const float *color = nullptr);',
-    'void draw(GLuint texId, bool rotate = false, bool swapY = false, const float *coords = nullptr, const float *color = nullptr, bool applyVideoFilter = false, int sourceWidth = 0, int sourceHeight = 0);',
-    "quad draw filter argument",
-)
-replace_once(
-    quad_h,
-    '\tGLint tintUniform;\n',
-    '\tGLint tintUniform;\n\tGLint videoFilterUniform;\n\tGLint outputSizeUniform;\n',
-    "quad shader uniform fields",
-)
-quad_cpp = CORE / "core" / "rend" / "gles" / "quad.cpp"
-replace_once(
-    quad_cpp,
-    '#include "quad.h"\n',
-    '#include "quad.h"\n#include "cfg/option.h"\n',
-    "quad Flycast config include",
-)
-replace_once(
-    quad_cpp,
-    'uniform mediump vec4 tint;\n\nvoid main()\n{\n\tgl_FragColor = tint * texture(tex, vtx_uv);\n}',
-    '''uniform mediump vec4 tint;
-uniform int videoFilter;
-uniform mediump vec2 outputSize;
+# Keep Flycast's upstream presentation shader unchanged.
+# The custom post-process shader previously added here failed on some GLES2
+# drivers during GlQuadDrawer initialization. Retro filters stay hidden until
+# a separately validated GLES2 implementation is available.
 
-void main()
-{
-    vec2 uv = vtx_uv;
-    vec4 pixel = texture(tex, uv);
-    vec2 texel = vec2(1.0) / max(outputSize, vec2(1.0));
-
-    if (videoFilter == 1) {
-        // CRT: scan lines and a soft edge falloff.
-        float scan = 0.91 + 0.09 * cos(gl_FragCoord.y * 3.14159265);
-        vec2 centered = uv * 2.0 - 1.0;
-        float vignette = max(0.72, 1.0 - 0.12 * dot(centered, centered));
-        pixel.rgb *= scan * vignette;
-    } else if (videoFilter == 2) {
-        // Old television: warm, slightly desaturated phosphor and scan lines.
-        float luma = dot(pixel.rgb, vec3(0.299, 0.587, 0.114));
-        vec3 warm = vec3(luma * 1.05, luma * 0.99, luma * 0.88);
-        pixel.rgb = mix(pixel.rgb, warm, 0.42);
-        pixel.rgb *= 0.94 + 0.06 * cos(gl_FragCoord.y * 3.14159265);
-    } else if (videoFilter == 3) {
-        // Composite: a small horizontal chroma bleed, retaining most luminance detail.
-        vec3 leftColor = texture(tex, uv - vec2(texel.x, 0.0)).rgb;
-        vec3 rightColor = texture(tex, uv + vec2(texel.x, 0.0)).rgb;
-        vec3 bleed = (leftColor + rightColor) * 0.5;
-        pixel.rgb = mix(pixel.rgb, bleed, 0.18);
-        pixel.r = mix(pixel.r, texture(tex, uv + vec2(texel.x * 0.75, 0.0)).r, 0.08);
-        pixel.b = mix(pixel.b, texture(tex, uv - vec2(texel.x * 0.75, 0.0)).b, 0.08);
-    } else if (videoFilter == 4) {
-        // RGB mask: a repeating triad of sub-pixels.
-        float phase = mod(floor(gl_FragCoord.x), 3.0);
-        vec3 mask = vec3(0.72);
-        if (phase < 1.0) mask.r = 1.0;
-        else if (phase < 2.0) mask.g = 1.0;
-        else mask.b = 1.0;
-        pixel.rgb *= mask;
-    } else if (videoFilter == 5) {
-        // VHS: chroma separation and mild horizontal tracking bands.
-        float shift = texel.x * 1.35;
-        vec3 chroma = vec3(
-            texture(tex, uv - vec2(shift, 0.0)).r,
-            pixel.g,
-            texture(tex, uv + vec2(shift, 0.0)).b
-        );
-        float tracking = 0.94 + 0.06 * sin(gl_FragCoord.y * 0.23);
-        pixel.rgb = mix(pixel.rgb, chroma, 0.55) * tracking;
-    }
-    gl_FragColor = tint * pixel;
-}''',
-    "retro shader implementations",
-)
-replace_once(
-    quad_cpp,
-    '\ttintUniform = glGetUniformLocation(shader, "tint");\n',
-    '\ttintUniform = glGetUniformLocation(shader, "tint");\n\tvideoFilterUniform = glGetUniformLocation(shader, "videoFilter");\n\toutputSizeUniform = glGetUniformLocation(shader, "outputSize");\n',
-    "primary shader filter uniforms",
-)
-replace_once(
-    quad_cpp,
-    '\trot90TintUniform = glGetUniformLocation(rot90shader, "tint");\n',
-    '\trot90TintUniform = glGetUniformLocation(rot90shader, "tint");\n\trot90VideoFilterUniform = glGetUniformLocation(rot90shader, "videoFilter");\n\trot90OutputSizeUniform = glGetUniformLocation(rot90shader, "outputSize");\n',
-    "rotated shader filter uniforms",
-)
-replace_once(
-    quad_h,
-    '\tGLint rot90TintUniform;\n',
-    '\tGLint rot90TintUniform;\n\tGLint rot90VideoFilterUniform;\n\tGLint rot90OutputSizeUniform;\n',
-    "rotated shader uniform fields",
-)
-replace_once(
-    quad_cpp,
-    'void GlQuadDrawer::draw(GLuint texId, bool rotate, bool swapY, const float *coords, const float *color)\n',
-    'void GlQuadDrawer::draw(GLuint texId, bool rotate, bool swapY, const float *coords, const float *color, bool applyVideoFilter, int sourceWidth, int sourceHeight)\n',
-    "quad draw implementation signature",
-)
-replace_once(
-    quad_cpp,
-    '\tglUniform4fv(rotate ? rot90TintUniform : tintUniform, 1, color);\n',
-    '\tglUniform4fv(rotate ? rot90TintUniform : tintUniform, 1, color);\n\tGLint viewport[4] = { 0, 0, 1, 1 };\n\tglGetIntegerv(GL_VIEWPORT, viewport);\n\tglUniform1i(rotate ? rot90VideoFilterUniform : videoFilterUniform, applyVideoFilter ? config::VideoFilter.get() : 0);\n\tglUniform2f(rotate ? rot90OutputSizeUniform : outputSizeUniform, sourceWidth > 0 ? (float)sourceWidth : (viewport[2] > 0 ? (float)viewport[2] : 1.f), sourceHeight > 0 ? (float)sourceHeight : (viewport[3] > 0 ? (float)viewport[3] : 1.f));\n',
-    "per-frame filter uniforms",
-)
-gldraw = CORE / "core" / "rend" / "gles" / "gldraw.cpp"
-replace_once(
-    gldraw,
-    'if (gl.bogusBlitFramebuffer || config::Rotate90)\n',
-    'if (gl.bogusBlitFramebuffer || config::Rotate90 || config::VideoFilter != 0)\n',
-    "route filtered final frame through GLES shader",
-)
-replace_once(
-    gldraw,
-    'gl.quadDrawer->draw(framebuffer->getTexture(), config::Rotate90, true, vertices);',
-    'gl.quadDrawer->draw(framebuffer->getTexture(), config::Rotate90, true, vertices, nullptr, config::VideoFilter != 0, framebuffer->getWidth(), framebuffer->getHeight());',
-    "apply filter to final screen output only",
-)
-
-print("Android TV shell and Flycast settings/shader patches applied.")
+print("Android TV shell applied; upstream GLES2 shaders preserved.")
