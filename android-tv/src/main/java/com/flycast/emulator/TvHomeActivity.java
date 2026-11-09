@@ -408,6 +408,7 @@ public final class TvHomeActivity extends Activity {
                 lines.add("");
             lines.add(header);
             sectionStart = lines.size() - 1;
+            sectionEnd = lines.size();
         } else {
             for (int i = sectionStart + 1; i < lines.size(); i++) {
                 String trimmed = lines.get(i).trim();
