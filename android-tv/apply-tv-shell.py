@@ -51,102 +51,53 @@ replace_once(
     "correct Russian graphics explanation",
 )
 
-# GLES2 palette workaround: the GPU-side paletted-texture path is known to
-# produce corrupted graphics on Mali-450-class drivers. Use Flycast's existing
-# CPU palette conversion path instead of enabling DumpTextures (which writes
-# every texture to storage as a debugging side effect).
-tex_cache = CORE / "core" / "rend" / "TexCache.h"
+# Register already-connected and newly-connected Android HID/Bluetooth gamepads.
+# Flycast's BaseGLActivity already forwards key and joystick-axis events to this
+# manager; the missing step on some Android TV builds is creating the native
+# Maple device before the first event arrives (and refreshing hot-plugged devices).
+input_manager_java = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "java" / "com" / "flycast" / "emulator" / "periph" / "InputDeviceManager.java"
 replace_once(
-    tex_cache,
-    '''\tstatic bool IsGpuHandledPaletted(TSP tsp, TCW tcw, int area)
-\t{
-\t\t// Some palette textures are handled on the GPU
-\t\t// This is currently limited to textures using nearest or bilinear filtering and not mipmapped.
-\t\t// In 2-volume mode, only area 0 can be handled on the gpu.
-\t\t// Enabling texture upscaling or dumping also disables this mode.
-\t\treturn (tcw.PixelFmt == PixelPal4 || tcw.PixelFmt == PixelPal8)
-\t\t\t\t&& config::TextureUpscale == 1
-\t\t\t\t&& !config::DumpTextures
-\t\t\t\t&& !custom_texture.enabled()
-\t\t\t\t&& tsp.FilterMode <= 1
-\t\t\t\t&& !tcw.MipMapped
-\t\t\t\t&& !tcw.VQ_Comp
-\t\t\t\t&& area == 0;
-\t}''',
-    '''\tstatic bool IsGpuHandledPaletted(TSP tsp, TCW tcw, int area)
-\t{
-\t\t// GPU-side palette lookup is unreliable on this Android GLES2 Mali target.
-\t\t// Fall back to Flycast's normal CPU palette conversion without dumping
-\t\t// texture files to storage.
-\t\t#if defined(__ANDROID__) && defined(GLES2)
-\t\treturn false;
-\t\t#else
-\t\t// Some palette textures are handled on the GPU
-\t\t// This is currently limited to textures using nearest or bilinear filtering and not mipmapped.
-\t\t// In 2-volume mode, only area 0 can be handled on the gpu.
-\t\t// Enabling texture upscaling or dumping also disables this mode.
-\t\treturn (tcw.PixelFmt == PixelPal4 || tcw.PixelFmt == PixelPal8)
-\t\t\t\t&& config::TextureUpscale == 1
-\t\t\t\t&& !config::DumpTextures
-\t\t\t\t&& !custom_texture.enabled()
-\t\t\t\t&& tsp.FilterMode <= 1
-\t\t\t\t&& !tcw.MipMapped
-\t\t\t\t&& !tcw.VQ_Comp
-\t\t\t\t&& area == 0;
-\t\t#endif
-\t}''',
-    "disable GPU-side palette lookup on Android GLES2",
+    input_manager_java,
+    '''        inputManager = (InputManager)applicationContext.getSystemService(Context.INPUT_SERVICE);
+        inputManager.registerInputDeviceListener(this, null);''',
+    '''        inputManager = (InputManager)applicationContext.getSystemService(Context.INPUT_SERVICE);
+        inputManager.registerInputDeviceListener(this, null);
+        // Pairing may happen before Flycast starts. Register every currently
+        // attached HID gamepad/joystick immediately instead of waiting for a
+        // device-added callback that will never arrive for an existing device.
+        for (int deviceId : inputManager.getInputDeviceIds())
+            createDevice(deviceId);''',
+    "register already-connected Android game controllers",
 )
-
-
-# Mali-450 GLES2 geometry workaround: orphan the streaming vertex/index buffer
-# storage before every frame upload. The GLES2 renderer reuses VBO/IBO objects
-# with glBufferSubData; some Mali-450 drivers can mishandle writes to storage
-# that may still be consumed by queued draws. Re-specifying the store detaches
-# the previous frame's storage without changing shaders or menu settings.
-gles_header = CORE / "core" / "rend" / "gles" / "gles.h"
 replace_once(
-    gles_header,
-    '''\tvoid update(const void *data, GLsizeiptr size)
-\t{
-\t\tbind();
-\t\tif (size > this->size)
-\t\t{
-\t\t\tglBufferData(type, size, data, usage);
-\t\t\tthis->size = size;
-\t\t}
-\t\telse
-\t\t{
-\t\t\tglBufferSubData(type, 0, size, data);
-\t\t}
-\t}''',
-    '''\tvoid update(const void *data, GLsizeiptr size)
-\t{
-\t\tbind();
-\t\t#if defined(__ANDROID__) && defined(GLES2)
-\t\t// Orphan dynamic geometry/index storage before uploading this frame.
-\t\t// This avoids reusing a Mali-450 GLES2 buffer store that a queued draw
-\t\t// from the previous frame may still be reading.
-\t\tif (usage == GL_STREAM_DRAW)
-\t\t{
-\t\t\tglBufferData(type, size, nullptr, usage);
-\t\t\tif (size > 0)
-\t\t\t\tglBufferSubData(type, 0, size, data);
-\t\t\tthis->size = size;
-\t\t\treturn;
-\t\t}
-\t\t#endif
-\t\tif (size > this->size)
-\t\t{
-\t\t\tglBufferData(type, size, data, usage);
-\t\t\tthis->size = size;
-\t\t}
-\t\telse
-\t\t{
-\t\t\tglBufferSubData(type, 0, size, data);
-\t\t}
-\t}''',
-    "orphan GLES2 Mali streaming geometry/index buffers per frame",
+    input_manager_java,
+    '''    @Override
+    public void onInputDeviceAdded(int i) {
+    }
+
+    @Override
+    public void onInputDeviceRemoved(int i) {''',
+    '''    @Override
+    public void onInputDeviceAdded(int i) {
+        createDevice(i);
+    }
+
+    @Override
+    public void onInputDeviceRemoved(int i) {''',
+    "register Bluetooth controllers when hot-plugged",
+)
+replace_once(
+    input_manager_java,
+    '''    @Override
+    public void onInputDeviceChanged(int i) {
+    }''',
+    '''    @Override
+    public void onInputDeviceChanged(int i) {
+        if (knownDevices.remove(i))
+            joystickRemoved(i);
+        createDevice(i);
+    }''',
+    "refresh changed or re-paired Bluetooth controllers",
 )
 
 
