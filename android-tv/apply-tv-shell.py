@@ -155,80 +155,9 @@ launcher_alias.set(A + "targetActivity", activity_name)
 ET.indent(tree, space="    ")
 tree.write(manifest, encoding="utf-8", xml_declaration=True)
 
-# Expose one Flycast-owned option for the actual OpenGL post-process shader.
-# Reload emu.cfg whenever the TV frontend launches the native activity. This makes
-# changed profile/filter values take effect even if Android kept the Application alive.
-jni_java = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "java" / "com" / "flycast" / "emulator" / "emu" / "JNIdc.java"
-replace_once(
-    jni_java,
-    '\tpublic static native void setGameUri(String fileName);\n',
-    '\tpublic static native void setGameUri(String fileName);\n\tpublic static native void applyTvSettings();\n',
-    "TV settings JNI declaration",
-)
-base_activity = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "java" / "com" / "flycast" / "emulator" / "BaseGLActivity.java"
-replace_once(
-    base_activity,
-    '        if (result != null) {\n            showAlertDialog(result);\n            return;\n        }\n        Log.i("flycast", "Environment initialized");',
-    '        if (result != null) {\n            showAlertDialog(result);\n            return;\n        }\n        JNIdc.applyTvSettings();\n        Log.i("flycast", "Environment initialized");',
-    "apply saved TV settings before surface creation",
-)
-android_cpp = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "jni" / "src" / "Android.cpp"
-replace_once(
-    android_cpp,
-    'extern "C" JNIEXPORT void JNICALL Java_com_flycast_emulator_emu_JNIdc_setGameUri(JNIEnv *env, jobject obj, jstring jfileName)',
-    'extern "C" JNIEXPORT void JNICALL Java_com_flycast_emulator_emu_JNIdc_applyTvSettings(JNIEnv *env, jobject obj)\n{\n\tif (config::open())\n\t\tconfig::Settings::instance().load(false);\n}\n\nextern "C" JNIEXPORT void JNICALL Java_com_flycast_emulator_emu_JNIdc_setGameUri(JNIEnv *env, jobject obj, jstring jfileName)',
-    "native Flycast settings reload",
-)
+# Preserve the exact upstream Android renderer and native build configuration.
+# The first device-tested APK used Flycast's unmodified Android GLES path.
+# Do not force GLES2, disable Vulkan, or reload emu.cfg through a custom JNI hook
+# until each change has been independently verified on the RK3528 box.
 
-# This Android TV target is deliberately GLES2/OpenGL-only. Upstream's Android
-# JNI source list compiles the Vulkan frame-pacing bridge unconditionally; that
-# bridge includes Vulkan-Hpp even when USE_VULKAN=OFF. Exclude it from this build.
-android_jni_cmake = CORE / "shell" / "android-studio" / "flycast" / "src" / "main" / "jni" / "src" / "CMakeLists.txt"
-replace_once(
-    android_jni_cmake,
-    '\t\t\tswappygl.cpp\n\t\t\tswappyvk.cpp)',
-    '\t\t\tswappygl.cpp)',
-    "exclude Vulkan-only Android frame-pacing bridge from GLES2 build",
-)
-
-# The RK3528 Mali-450 target is OpenGL ES 2.0 class. Upstream's generic
-# Android CMake default selects the ES3 shader path; build an explicit ES2
-# renderer and ES2 ImGui backend so the app can run on this target.
-cmake_root = CORE / "CMakeLists.txt"
-replace_once(
-    cmake_root,
-    'if(ANDROID)\n\t\ttarget_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)\n\t\tadd_subdirectory(shell/android-studio/flycast/src/main/jni/src)',
-    '''if(ANDROID)
-        if(USE_GLES2)
-            target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES2 IMGUI_IMPL_OPENGL_ES2)
-        else()
-            target_compile_definitions(${PROJECT_NAME} PRIVATE GLES GLES3)
-        endif()
-        add_subdirectory(shell/android-studio/flycast/src/main/jni/src)''',
-    "select GLES2 for RK3528 in the Android native target",
-)
-gradle_file = CORE / "shell" / "android-studio" / "flycast" / "build.gradle.kts"
-replace_once(
-    gradle_file,
-    '                arguments += "-DANDROID_ARM_MODE=arm"\n',
-    '                arguments += "-DANDROID_ARM_MODE=arm"\n'
-    '                arguments += "-DUSE_GLES2=ON"\n'
-    '                arguments += "-DUSE_OPENGL=ON"\n'
-    '                arguments += "-DUSE_VULKAN=OFF"\n',
-    "configure the Android TV build for the RK3528 GLES2 GPU",
-)
-replace_once(
-    gradle_file,
-    '        minSdk = 21\n        targetSdk = 36\n',
-    '        minSdk = 21\n'
-    '        targetSdk = 36\n'
-    '        ndk { abiFilters += setOf("arm64-v8a", "armeabi-v7a") }\n',
-    "package both 64-bit and 32-bit ARM TV boxes",
-)
-
-# Keep Flycast's upstream presentation shader unchanged.
-# The custom post-process shader previously added here failed on some GLES2
-# drivers during GlQuadDrawer initialization. Retro filters stay hidden until
-# a separately validated GLES2 implementation is available.
-
-print("Android TV shell applied; upstream GLES2 shaders preserved.")
+print("Android TV shell applied; upstream Flycast renderer configuration preserved.")
