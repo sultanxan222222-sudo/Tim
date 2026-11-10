@@ -101,6 +101,19 @@ replace_once(
 )
 
 
+
+replace_once(
+    input_manager_java,
+    '''        if (device == null || (device.getSources() & InputDevice.SOURCE_CLASS_BUTTON) != InputDevice.SOURCE_CLASS_BUTTON)
+            return false;''',
+    '''        if (device == null
+                || ((device.getSources() & InputDevice.SOURCE_CLASS_BUTTON) != InputDevice.SOURCE_CLASS_BUTTON
+                && (device.getSources() & InputDevice.SOURCE_CLASS_JOYSTICK) != InputDevice.SOURCE_CLASS_JOYSTICK))
+            return false;''',
+    "accept both button-only and joystick-class Android HID controllers",
+)
+
+
 # Register the TV launcher while retaining the original native activity.
 tree = ET.parse(manifest)
 root = tree.getroot()
