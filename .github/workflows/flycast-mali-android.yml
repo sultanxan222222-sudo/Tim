@@ -95,7 +95,7 @@ jobs:
         with:
           name: MaliForge-Dreamcast-Android-debug-apk
           path: |
-            dist/Flycast-Mali-TV-debug.apk
+            dist/MaliForge-Dreamcast-Android-debug.apk
             dist/SHA256SUMS.txt
             dist/BUILD_INFO.txt
           if-no-files-found: error
