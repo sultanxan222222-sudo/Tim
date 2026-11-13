@@ -199,6 +199,12 @@ bool GlQuadDrawer::drawMaliForge(GLuint texId, bool rotate, bool swapY, const fl
 
 
 def patch_gldraw(source: str) -> str:
+    source = replace_once(
+        source,
+        "if (gl.bogusBlitFramebuffer || config::Rotate90)",
+        "if (gl.bogusBlitFramebuffer || config::Rotate90 || (gl.mali && gl.is_gles))",
+        "use MaliForge when the GLES Mali presenter is available",
+    )
     old = "\t\tgl.quadDrawer->draw(framebuffer->getTexture(), config::Rotate90, true, vertices);"
     new = """\t\t// MaliForge runs after the Dreamcast PVR frame has been rendered by
 \t\t// Flycast. It only touches the final presentation quad; OSD/UI is drawn later.
