@@ -144,7 +144,7 @@ GlQuadDrawer::GlQuadDrawer()"""
 
     if "bool GlQuadDrawer::drawMaliForge(" in source:
         raise RuntimeError("MaliForge draw function already exists; refusing duplicate integration")
-    method = r"""
+    method = """
 
 bool GlQuadDrawer::drawMaliForge(GLuint texId, bool rotate, bool swapY, const float *coords,
 \t\tconst float *color, int sourceWidth, int sourceHeight, float sharpness)
