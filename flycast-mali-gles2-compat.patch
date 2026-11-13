@@ -1,0 +1,174 @@
+diff --git a/core/rend/gles/gles.cpp b/core/rend/gles/gles.cpp
+index aaecb6cd9aef6c9e252be755dfec26ceb539c21b..0000000000000000000000000000000000000000 100644
+--- a/core/rend/gles/gles.cpp
++++ b/core/rend/gles/gles.cpp
+@@ -20,6 +20,7 @@
+ #endif
+ 
+ #include <cmath>
+ #include <memory>
++#include <vector>
+ 
+ #ifdef GLES
+@@ -70,4 +71,12 @@ const char *PixelCompatShader = R"(
+ #if TARGET_GL == GLES2 || TARGET_GL == GL2
+ #define in varying
+ #endif
++
++// Fragment highp is optional in OpenGL ES 2.0. Some mobile GPUs expose GLES2
++// but do not implement highp fragment floats. Keep vertex precision unchanged
++// and downgrade only fragment-shader highp qualifiers when the capability probe
++// reports that they are unavailable.
++#if TARGET_GL == GLES2 && HIGH_PRECISION_FLOAT == 0
++#define highp mediump
++#endif
+ )";
+@@ -532,5 +541,6 @@ void findGLVersion()
+ 		}
+ 		const char *extensions = (const char *)glGetString(GL_EXTENSIONS);
++		if (extensions == nullptr) extensions = "";
+ 		if (strstr(extensions, "GL_OES_packed_depth_stencil") != NULL)
+ 			gl.GL_OES_packed_depth_stencil_supported = true;
+ 		if (strstr(extensions, "GL_OES_depth24") != NULL)
+@@ -538,8 +548,10 @@ void findGLVersion()
+ 		if (!gl.GL_OES_packed_depth_stencil_supported && gl.gl_major < 3)
+ 			INFO_LOG(RENDERER, "Packed depth/stencil not supported: no modifier volumes when rendering to a texture");
+-		GLint ranges[2];
+-		GLint precision;
++		GLint ranges[2] = { 0, 0 };
++		GLint precision = 0;
+ 		glGetShaderPrecisionFormat(GL_FRAGMENT_SHADER, GL_HIGH_FLOAT, ranges, &precision);
+ 		gl.highp_float_supported = (ranges[0] != 0 || ranges[1] != 0) && precision != 0;
++		if (gl.gl_major < 3 && !gl.highp_float_supported)
++			WARN_LOG(RENDERER, "GLES2 fragment highp is unavailable; using mediump in fragment shaders");
+ 		if (!gl.border_clamp_supported)
+ 			gl.border_clamp_supported = strstr(extensions, "GL_EXT_texture_border_clamp") != nullptr;
+@@ -599,9 +611,13 @@ void findGLVersion()
+ 	}
+ #endif
+ 	const char *vendor = (const char *)glGetString(GL_VENDOR);
+ 	const char *renderer = (const char *)glGetString(GL_RENDERER);
++	if (vendor == nullptr) vendor = "unknown";
++	if (renderer == nullptr) renderer = "unknown";
++	const char *version = (const char *)glGetString(GL_VERSION);
++	if (version == nullptr) version = "unknown";
+ 	gl.mesa_nouveau = !stricmp(vendor, "nouveau")
+ 			|| (!stricmp(vendor, "Mesa") && !strncmp(renderer, "NV", 2));
+-	gl.mali = !stricmp(vendor, "arm");
++	gl.mali = !stricmp(vendor, "arm") || strstr(renderer, "Mali") != nullptr;
+ 	NOTICE_LOG(RENDERER, "OpenGL%s version %d.%d", gl.is_gles ? " ES" : "", gl.gl_major, gl.gl_minor);
+-	NOTICE_LOG(RENDERER, "Vendor '%s' Renderer '%s' Version '%s'", vendor, renderer, glGetString(GL_VERSION));
++	NOTICE_LOG(RENDERER, "Vendor '%s' Renderer '%s' Version '%s'", vendor, renderer, version);
+@@ -625,24 +641,31 @@ struct ShaderUniforms_t ShaderUniforms;
+ GLuint gl_CompileShader(const char* shader,GLuint type)
+ {
+-	GLint result;
+-	GLint compile_log_len;
++	GLint result = GL_FALSE;
++	GLint compile_log_len = 0;
+ 	GLuint rv=glCreateShader(type);
++	if (rv == 0)
++	{
++		WARN_LOG(RENDERER, "Shader: glCreateShader failed for %s shader", type == GL_VERTEX_SHADER ? "vertex" : "fragment");
++		return 0;
++	}
+ 	glShaderSource(rv, 1,&shader, NULL);
+ 	glCompileShader(rv);
+ 
+-	//lets see if it compiled ...
+ 	glGetShaderiv(rv, GL_COMPILE_STATUS, &result);
+ 	glGetShaderiv(rv, GL_INFO_LOG_LENGTH, &compile_log_len);
+ 
+-	if (!result && compile_log_len>0)
++	if (result != GL_TRUE)
+ 	{
+-		char* compile_log=(char*)malloc(compile_log_len);
+-		*compile_log=0;
+-
+-		glGetShaderInfoLog(rv, compile_log_len, &compile_log_len, compile_log);
+-		WARN_LOG(RENDERER, "Shader: %s \n%s", result ? "compiled!" : "failed to compile", compile_log);
+-
+-		free(compile_log);
++		std::vector<GLchar> compile_log((size_t)(compile_log_len > 0 ? compile_log_len : 1) + 1, '\0');
++		GLsizei written = 0;
++		if (compile_log_len > 0)
++			glGetShaderInfoLog(rv, (GLsizei)compile_log.size(), &written, compile_log.data());
++		const char *stage = type == GL_VERTEX_SHADER ? "vertex" : "fragment";
++		WARN_LOG(RENDERER, "Shader: failed to compile %s shader: %s", stage,
++				compile_log_len > 0 ? compile_log.data() : "driver returned no compiler log");
++		INFO_LOG(RENDERER, "// %s SHADER SOURCE\n%s\n// END", stage, shader);
++		glDeleteShader(rv);
++		return 0;
+ 	}
+ 
+ 	return rv;
+@@ -652,8 +675,21 @@ GLuint gl_CompileAndLink(const char *vertexShader, const char *fragmentShader)
+ {
+ 	//create shaders
+ 	GLuint vs = gl_CompileShader(vertexShader, GL_VERTEX_SHADER);
++	if (vs == 0)
++		throw RendererException(i18n::T("OpenGL shader compilation failed"));
+ 	GLuint ps = gl_CompileShader(fragmentShader, GL_FRAGMENT_SHADER);
++	if (ps == 0)
++	{
++		glDeleteShader(vs);
++		throw RendererException(i18n::T("OpenGL shader compilation failed"));
++	}
+ 
+ 	GLuint program = glCreateProgram();
++	if (program == 0)
++	{
++		glDeleteShader(vs);
++		glDeleteShader(ps);
++		throw RendererException("OpenGL program creation failed");
++	}
+ 	glAttachShader(program, vs);
+ 	glAttachShader(program, ps);
+@@ -681,23 +704,24 @@ GLuint gl_CompileAndLink(const char *vertexShader, const char *fragmentShader)
+ {
+ 	GLint result;
+ 	glGetProgramiv(program, GL_LINK_STATUS, &result);
+ 
+-	GLint compile_log_len;
++	GLint compile_log_len = 0;
+ 	glGetProgramiv(program, GL_INFO_LOG_LENGTH, &compile_log_len);
+ 
+-	if (!result && compile_log_len>0)
++	if (result != GL_TRUE)
+ 	{
+-		compile_log_len+= 1024;
+-		char* compile_log=(char*)malloc(compile_log_len);
+-		*compile_log=0;
+-
+-		glGetProgramInfoLog(program, compile_log_len, &compile_log_len, compile_log);
+-		WARN_LOG(RENDERER, "Shader linking: %s \n (%d bytes), - %s -", result ? "linked" : "failed to link", compile_log_len, compile_log);
+-
+-		free(compile_log);
++		std::vector<GLchar> compile_log((size_t)(compile_log_len > 0 ? compile_log_len : 1) + 1, '\0');
++		GLsizei written = 0;
++		if (compile_log_len > 0)
++			glGetProgramInfoLog(program, (GLsizei)compile_log.size(), &written, compile_log.data());
++		WARN_LOG(RENDERER, "Shader linking failed: %s",
++				compile_log_len > 0 ? compile_log.data() : "driver returned no linker log");
+ 
+ 		// Dump the shaders source for troubleshooting
+ 		INFO_LOG(RENDERER, "// VERTEX SHADER\n%s\n// END", vertexShader);
+ 		INFO_LOG(RENDERER, "// FRAGMENT SHADER\n%s\n// END", fragmentShader);
++		glDeleteProgram(program);
++		glDeleteShader(vs);
++		glDeleteShader(ps);
+ 		throw RendererException(i18n::T("OpenGL shader compilation failed"));
+ 		// FIXME MINIDUMP-8A1, MINIDUMP-8A2, MINIDUMP-7YE
+ 	}
+diff --git a/core/rend/gles/gles.h b/core/rend/gles/gles.h
+index 9082a5dc0a9e901e04ecca2216a24b6ca01ec2fd..0000000000000000000000000000000000000000 100644
+--- a/core/rend/gles/gles.h
++++ b/core/rend/gles/gles.h
+@@ -570,6 +570,7 @@ class OpenGlSource : public ShaderSource
+ public:
+ 	OpenGlSource() : ShaderSource(gl.glsl_version_header) {
+ 		addConstant("TARGET_GL", gl.gl_version);
++		addConstant("HIGH_PRECISION_FLOAT", gl.highp_float_supported ? 1 : 0);
+ 		addSource(ShaderCompatSource);
+ 	}
+ };
