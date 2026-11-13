@@ -194,7 +194,7 @@ bool GlQuadDrawer::drawMaliForge(GLuint texId, bool rotate, bool swapY, const fl
 \treturn true;
 }
 """
-    source = source.rstrip() + method + "\n"
+    source = source.rstrip() + method.rstrip() + "\n"
     return source
 
 
