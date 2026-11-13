@@ -56,8 +56,7 @@ jobs:
 
       - name: Check and apply GLES2 compatibility patch
         run: |
-          git -C flycast apply --check "${GITHUB_WORKSPACE}/flycast-mali-gles2-compat.patch"
-          git -C flycast apply "${GITHUB_WORKSPACE}/flycast-mali-gles2-compat.patch"
+          python3 scripts/apply_patch.py flycast
           git -C flycast diff --check
 
       - name: Validate patch contract
