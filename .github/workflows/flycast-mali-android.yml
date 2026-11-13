@@ -1,9 +1,10 @@
-name: Flycast Mali Android debug APK
+name: MaliForge Dreamcast Android emulator APK
 
 on:
   push:
     branches:
       - build/flycast-mali-android
+      - engine/maliforge-flycast-emulator
   workflow_dispatch:
 
 permissions:
@@ -59,6 +60,11 @@ jobs:
           python3 scripts/apply_patch.py flycast
           git -C flycast diff --check
 
+      - name: Integrate MaliForge into the Flycast GLES renderer
+        run: |
+          python3 scripts/integrate-maliforge.py flycast
+          git -C flycast diff --check
+
       - name: Validate patch contract
         run: python3 -m unittest discover -s tests -v
 
@@ -75,10 +81,11 @@ jobs:
           test -n "${APK}"
           test -s "${APK}"
           mkdir -p dist
-          cp "${APK}" dist/Flycast-Mali-TV-debug.apk
-          sha256sum dist/Flycast-Mali-TV-debug.apk | tee dist/SHA256SUMS.txt
+          cp "${APK}" dist/MaliForge-Dreamcast-Android-debug.apk
+          sha256sum dist/MaliForge-Dreamcast-Android-debug.apk | tee dist/SHA256SUMS.txt
           {
-            echo "Flycast source: ${FLYCAST_COMMIT}"
+            echo "Flycast emulation core: ${FLYCAST_COMMIT}
+            echo "MaliForge graphics stage: GLES2 edge-adaptive final-frame compositor (Mali GPUs)""
             echo "Patched build: ${GITHUB_SHA}"
             echo "APK size: $(stat -c '%s' dist/Flycast-Mali-TV-debug.apk) bytes"
           } | tee dist/BUILD_INFO.txt
@@ -86,7 +93,7 @@ jobs:
       - name: Upload installable APK
         uses: actions/upload-artifact@v7
         with:
-          name: Flycast-Mali-TV-debug-apk
+          name: MaliForge-Dreamcast-Android-debug-apk
           path: |
             dist/Flycast-Mali-TV-debug.apk
             dist/SHA256SUMS.txt
