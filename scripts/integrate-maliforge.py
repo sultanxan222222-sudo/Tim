@@ -210,6 +210,15 @@ def patch_gldraw(source: str) -> str:
     return replace_once(source, old, new, "MaliForge final-frame hook")
 
 
+def patch_branding(source: str) -> str:
+    return replace_once(
+        source,
+        '<string name="app_name" translatable="false">Flycast</string>',
+        '<string name="app_name" translatable="false">MaliForge Dreamcast</string>',
+        "Android launcher branding",
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("flycast_root", type=Path)
@@ -226,6 +235,7 @@ def main() -> int:
         root / "core/rend/gles/quad.h": patch_quad_header,
         root / "core/rend/gles/quad.cpp": patch_quad_cpp,
         root / "core/rend/gles/gldraw.cpp": patch_gldraw,
+        root / "shell/android-studio/flycast/src/main/res/values/donottranslate.xml": patch_branding,
     }
 
     for path, patcher in targets.items():
