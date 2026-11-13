@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: flycast-mali-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   android-debug:
     name: Build patched Flycast APK
@@ -42,9 +46,12 @@ jobs:
 
       - name: Fetch pinned Flycast source and submodules
         run: |
-          git clone --recurse-submodules https://github.com/flyinghead/flycast.git flycast
-          git -C flycast checkout --detach "${FLYCAST_COMMIT}"
-          git -C flycast submodule update --init --recursive
+          mkdir flycast
+          git -C flycast init
+          git -C flycast remote add origin https://github.com/flyinghead/flycast.git
+          git -C flycast fetch --depth=1 origin "${FLYCAST_COMMIT}"
+          git -C flycast checkout --detach FETCH_HEAD
+          git -C flycast submodule update --init --recursive --depth 1
           test "$(git -C flycast rev-parse HEAD)" = "${FLYCAST_COMMIT}"
 
       - name: Check and apply GLES2 compatibility patch
