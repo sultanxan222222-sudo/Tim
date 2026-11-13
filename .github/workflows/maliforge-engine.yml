@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
+      - name: Decode engine source archive
+        run: |
+          base64 --decode MaliForge-Engine-1.0-source.tar.gz.b64 > MaliForge-Engine-1.0-source.tar.gz
+          tar xzf MaliForge-Engine-1.0-source.tar.gz
       - name: Configure and build core
         working-directory: MaliForge-Engine-1.0
         run: |
@@ -40,9 +44,11 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-      - name: Install NDK and CMake
-        run: sdkmanager --install "ndk;27.0.12077973" "cmake;3.22.1"
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
+      - name: Install Android platform, NDK and CMake
+        run: sdkmanager --install "platforms;android-35" "build-tools;35.0.0" "ndk;27.0.12077973" "cmake;3.22.1"
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v5
         with:
