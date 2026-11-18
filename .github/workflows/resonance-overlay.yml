@@ -84,13 +84,13 @@ jobs:
           from pathlib import Path
           source = Path('/tmp/flycast/core/rend/vulkan/frame_gen.cpp').read_text()
           def raw_shader(name):
-              pattern = r'const char \\*const ' + re.escape(name) + r' = R"\\((.*?)\\n\\)";'
+              pattern = r'const char \*const ' + re.escape(name) + r' = R"\((.*?)\n\)";'
               match = re.search(pattern, source, re.S)
               if not match:
                   raise SystemExit(f"missing shader constant: {name}")
               return match.group(1)
           Path('/tmp/mini_dlss_framegen_fine.comp').write_text(
-              raw_shader('kCommon') + '\\n' + raw_shader('kFine') + '\\n'
+              raw_shader('kCommon') + '\n' + raw_shader('kFine') + '\n'
           )
           PY
           glslangValidator -V -S comp /tmp/mini_dlss_framegen_fine.comp -o /tmp/mini_dlss_framegen_fine.spv
