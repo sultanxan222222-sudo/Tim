@@ -48,18 +48,9 @@ def main() -> None:
 	vec2 m = mo.xy;
 	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
 	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
-	vec3 realFrame = textureLod(curTex, uv, 0.0).rgb;
-
-	// Confidence-aware rejection: ambiguous motion and warped-sample disagreement
-	// are treated as possible occlusion/disocclusion, not as valid interpolation.
-	float residualReject = smoothstep(0.035, 0.10, mo.z);
-	float confidenceReject = 1.0 - clamp(mo.w, 0.0, 1.0);
-	float warpedLumaA = dot(a.rgb, vec3(0.2126, 0.7152, 0.0722));
-	float warpedLumaB = dot(b.rgb, vec3(0.2126, 0.7152, 0.0722));
-	float disocclusionReject = smoothstep(0.08, 0.20, abs(warpedLumaA - warpedLumaB));
-	float reject = max(residualReject, max(confidenceReject, disocclusionReject));
-	vec3 interpolated = mix(a.rgb, b.rgb, 0.5);
-	color = vec4(mix(interpolated, realFrame, reject), 1.0);
+	// a poor match (something appearing, a cut): the newer frame as it is
+	float w = smoothstep(0.03, 0.10, mo.z);
+	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
 }'''
     # Mini-DLSS variant of Flycast's ordinary presentation quad. It preserves the
     # existing alpha/colour logic when MINI_DLSS=0. When enabled, it performs
@@ -373,9 +364,17 @@ void main()
 	vec2 m = mo.xy;
 	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
 	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
-	// A poor match (something appearing, a cut): use the newer frame.
-	float w = smoothstep(0.03, 0.10, mo.z);
-	vec3 base = mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb;
+	vec3 realFrame = textureLod(curTex, uv, 0.0).rgb;
+
+	// Confidence-aware rejection: ambiguous motion and warped-sample disagreement
+	// are treated as possible occlusion/disocclusion, not as valid interpolation.
+	float residualReject = smoothstep(0.035, 0.10, mo.z);
+	float confidenceReject = 1.0 - clamp(mo.w, 0.0, 1.0);
+	float warpedLumaA = dot(a.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float warpedLumaB = dot(b.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float disocclusionReject = smoothstep(0.08, 0.20, abs(warpedLumaA - warpedLumaB));
+	float reject = max(residualReject, max(confidenceReject, disocclusionReject));
+	vec3 base = mix(mix(a.rgb, b.rgb, 0.5), realFrame, reject);
 
 	// Mini-DLSS spatial finishing pass: 10% stronger edge-aware sharpening.
 	vec2 texel = 1.0 / vec2(textureSize(curTex, 0));
@@ -408,8 +407,14 @@ void main()
     vec2 m = mo.xy;
     vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
     vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
-    float w = smoothstep(0.03, 0.10, mo.z);
-    color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
+    vec3 realFrame = textureLod(curTex, uv, 0.0).rgb;
+    float residualReject = smoothstep(0.035, 0.10, mo.z);
+    float confidenceReject = 1.0 - clamp(mo.w, 0.0, 1.0);
+    float lumaA = dot(a.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float lumaB = dot(b.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float disocclusionReject = smoothstep(0.08, 0.20, abs(lumaA - lumaB));
+    float reject = max(residualReject, max(confidenceReject, disocclusionReject));
+    color = vec4(mix(mix(a.rgb, b.rgb, 0.5), realFrame, reject), 1.0);
 }
 )";'''
     replace_once(frame_gen_cpp, ')";\n} // namespace', ')";\n' + mini_shader_constant + '\n} // namespace')
