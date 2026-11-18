@@ -2,7 +2,7 @@
 
 ## Research snapshot
 
-Reference project: [Apex Compute / ANR](https://github.com/apex-compute/ANR).
+Reference project: [Apex Compute / ANR](https://github.com/apex-compute/ANR); pinned research snapshot: [FG-V.B19 release](https://github.com/apex-compute/ANR/releases/tag/FG-V.B19).
 
 The latest public release checked for this adaptation is **FG-V.B19**, published 17 November 2026. The upstream README describes ANR FG as beta, while ANR SR and RR are listed as upcoming betas and the project's own source code is still marked as coming soon. The release notes list Windows 10/11 and Linux/SteamOS with Proton support on NVIDIA RTX 20+, GTX 16, AMD RX 5000+ and Intel Arc A/B GPUs.
 
@@ -12,7 +12,7 @@ ANR FG is not a portable PS4 SDK or renderer library. Its game integration relie
 
 1. **Confidence as a first-class signal.** A best motion vector is not sufficient: match residual, local texture information and ambiguity between the best and next-best candidate must influence whether a generated sample is trusted.
 2. **Reject bad temporal inputs.** Scene changes, occlusion/disocclusion, ambiguous motion and history discontinuities should fall back to a real source frame rather than forcing an interpolated result.
-3. **Repeatable comparison.** ANR's public `nr-record` tools record feature inputs losslessly and replay different implementations on identical frames. This specific capture DLL is built around OptiScaler/provider interfaces and is not a PS4 runtime dependency. We adopt the reproducibility principle for our own renderer captures and shader tests, not its DLL protocol.
+3. **Repeatable comparison.** ANR's public [`nr-record` tools](https://github.com/apex-compute/ANR/tree/main/record) record feature inputs losslessly and replay different implementations on identical frames. This specific capture DLL is built around OptiScaler/provider interfaces and is not a PS4 runtime dependency. We adopt the reproducibility principle for our own renderer captures and shader tests, not its DLL protocol.
 4. **Measure the result.** Compare image error/artifacts, GPU time, frame pacing and input latency with the effect disabled and enabled. A higher displayed refresh count alone is not evidence that emulation became faster.
 
 ## First code adaptation in this branch
