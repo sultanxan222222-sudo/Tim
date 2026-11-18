@@ -338,6 +338,7 @@ void main()
         '            whats_next/src/frame_generation_policy.cpp\n'
         '            whats_next/src/frame_generation_controller.cpp\n'
         '            whats_next/src/frame_generation_bridge.cpp\n'
+        '            whats_next/src/render_budget_controller.cpp\n'
     )
     replace_once(
         context_cpp,
