@@ -54,9 +54,11 @@ jobs:
           grep -q 'whatsNextBridge.commit_real_frame(); // commit each real source frame' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           git -C /tmp/flycast diff --check
           test -f /tmp/flycast/core/rend/vulkan/whats_next/shaders/mini_dlss_upscale.comp
+          test -f /tmp/flycast/core/rend/vulkan/whats_next/src/render_budget_controller.cpp
+          grep -q 'render_budget_controller.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
       - name: Compile WHAT'S NEXT renderer bridge sources
         run: |
-          for source in history_gate frame_generation_policy frame_generation_controller frame_generation_bridge; do
+          for source in history_gate frame_generation_policy frame_generation_controller frame_generation_bridge render_budget_controller; do
             g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror \
               -I /tmp/flycast/core/rend/vulkan/whats_next/include \
               -fsyntax-only "/tmp/flycast/core/rend/vulkan/whats_next/src/${source}.cpp"
@@ -106,3 +108,9 @@ jobs:
           Path('/tmp/mini_dlss_framegen.frag').write_text(source[start:end])
           PY
           glslangValidator -V -S frag /tmp/mini_dlss_framegen.frag -o /tmp/mini_dlss_framegen.spv
+
+      - name: Run host tests for adaptive render budget policy
+        run: |
+          cmake -S dreamcast/mini-dlss -B /tmp/mini-dlss-host-build -DCMAKE_BUILD_TYPE=Release
+          cmake --build /tmp/mini-dlss-host-build --parallel 2
+          ctest --test-dir /tmp/mini-dlss-host-build --output-on-failure
