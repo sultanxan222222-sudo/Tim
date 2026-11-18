@@ -303,6 +303,7 @@ void main()
         module / "src/frame_generation_policy.cpp",
         module / "src/frame_generation_controller.cpp",
         module / "src/frame_generation_bridge.cpp",
+        module / "src/render_budget_controller.cpp",
         module / "shaders/edge_aware_sharpen.comp",
         module / "shaders/mini_dlss_upscale.comp",
     )
@@ -315,7 +316,8 @@ void main()
     shutil.copytree(module / "include", target / "include", dirs_exist_ok=True)
     (target / "src").mkdir(parents=True, exist_ok=True)
     for name in ("history_gate.cpp", "frame_generation_policy.cpp",
-                 "frame_generation_controller.cpp", "frame_generation_bridge.cpp"):
+                 "frame_generation_controller.cpp", "frame_generation_bridge.cpp",
+                 "render_budget_controller.cpp"):
         shutil.copy2(module / "src" / name, target / "src" / name)
     shader_target = target / "shaders"
     shader_target.mkdir(parents=True, exist_ok=True)
