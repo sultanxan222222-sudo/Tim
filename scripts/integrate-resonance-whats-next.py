@@ -48,9 +48,18 @@ def main() -> None:
 	vec2 m = mo.xy;
 	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
 	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
-	// a poor match (something appearing, a cut): the newer frame as it is
-	float w = smoothstep(0.03, 0.10, mo.z);
-	color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
+	vec3 realFrame = textureLod(curTex, uv, 0.0).rgb;
+
+	// Confidence-aware rejection: ambiguous motion and warped-sample disagreement
+	// are treated as possible occlusion/disocclusion, not as valid interpolation.
+	float residualReject = smoothstep(0.035, 0.10, mo.z);
+	float confidenceReject = 1.0 - clamp(mo.w, 0.0, 1.0);
+	float warpedLumaA = dot(a.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float warpedLumaB = dot(b.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float disocclusionReject = smoothstep(0.08, 0.20, abs(warpedLumaA - warpedLumaB));
+	float reject = max(residualReject, max(confidenceReject, disocclusionReject));
+	vec3 interpolated = mix(a.rgb, b.rgb, 0.5);
+	color = vec4(mix(interpolated, realFrame, reject), 1.0);
 }'''
     # Mini-DLSS variant of Flycast's ordinary presentation quad. It preserves the
     # existing alpha/colour logic when MINI_DLSS=0. When enabled, it performs
@@ -114,6 +123,142 @@ def main() -> None:
 \tFragColor = pushConstants.color * sourceColor;
 #endif'''
 
+
+    fine_shader_old = r'''const char *const kFine = R"(
+void main()
+{
+	ivec2 cell = ivec2(gl_GlobalInvocationID.xy);
+	if (cell.x >= 160 || cell.y >= 90)
+		return;
+	vec2 cs = 1.0 / vec2(160.0, 90.0);
+	vec2 c0 = (vec2(cell) + 0.5) * cs;
+	loadCur(c0, cs);
+	// the coarse neighbours' moves, and no move
+	ivec2 cc = cell / 2;
+	float best = sad(c0, cs, vec2(0.0));
+	vec2 bestM = vec2(0.0);
+	for (int b = -1; b <= 1; b++)
+		for (int a = -1; a <= 1; a++)
+		{
+			ivec2 n = clamp(cc + ivec2(a, b), ivec2(0), ivec2(79, 44));
+			vec2 m = texelFetch(coarseTex, n, 0).xy;
+			float s = sad(c0, cs, m) + 0.002;
+			if (s < best)
+			{
+				best = s;
+				bestM = m;
+			}
+		}
+	// refined by quarter cells
+	vec2 base = bestM;
+	vec2 stepv = cs * 0.25;
+	for (int dy = -2; dy <= 2; dy++)
+		for (int dx = -2; dx <= 2; dx++)
+		{
+			if (dx == 0 && dy == 0)
+				continue;
+			vec2 m = base + vec2(dx, dy) * stepv;
+			float s = sad(c0, cs, m) + 0.001 * length(vec2(dx, dy));
+			if (s < best)
+			{
+				best = s;
+				bestM = m;
+			}
+		}
+	imageStore(outImage, cell, vec4(bestM, best, 0.0));
+}
+)";'''
+    fine_shader_new = r'''const char *const kFine = R"(
+void considerMotionCandidate(
+	vec2 motion, float score,
+	inout vec2 bestMotion, inout float bestScore,
+	inout float secondScore, inout bool hasSecond)
+{
+	// Repeated coarse neighbours must not inflate confidence as independent matches.
+	if (length(motion - bestMotion) < 0.00001)
+	{
+		bestScore = min(bestScore, score);
+		return;
+	}
+	if (score < bestScore)
+	{
+		secondScore = bestScore;
+		hasSecond = true;
+		bestScore = score;
+		bestMotion = motion;
+	}
+	else if (!hasSecond || score < secondScore)
+	{
+		secondScore = score;
+		hasSecond = true;
+	}
+}
+
+void main()
+{
+	ivec2 cell = ivec2(gl_GlobalInvocationID.xy);
+	if (cell.x >= 160 || cell.y >= 90)
+		return;
+	vec2 cs = 1.0 / vec2(160.0, 90.0);
+	vec2 c0 = (vec2(cell) + 0.5) * cs;
+	loadCur(c0, cs);
+
+	// Local texture variance helps identify ambiguous motion in flat areas.
+	float sum = 0.0;
+	float sumSq = 0.0;
+	for (int k = 0; k < 64; ++k)
+	{
+		sum += cur[k];
+		sumSq += cur[k] * cur[k];
+	}
+	float mean = sum / 64.0;
+	float variance = max(sumSq / 64.0 - mean * mean, 0.0);
+
+	ivec2 cc = cell / 2;
+	float best = sad(c0, cs, vec2(0.0));
+	float second = 1e9;
+	bool hasSecond = false;
+	vec2 bestM = vec2(0.0);
+
+	// Keep a distinct runner-up while searching the coarse neighbourhood.
+	for (int b = -1; b <= 1; b++)
+		for (int a = -1; a <= 1; a++)
+		{
+			ivec2 n = clamp(cc + ivec2(a, b), ivec2(0), ivec2(79, 44));
+			vec2 m = texelFetch(coarseTex, n, 0).xy;
+			float score = sad(c0, cs, m) + 0.002;
+			considerMotionCandidate(m, score, bestM, best, second, hasSecond);
+		}
+
+	vec2 base = bestM;
+	vec2 stepv = cs * 0.25;
+	for (int dy = -2; dy <= 2; dy++)
+		for (int dx = -2; dx <= 2; dx++)
+		{
+			if (dx == 0 && dy == 0)
+				continue;
+			vec2 m = base + vec2(dx, dy) * stepv;
+			float score = sad(c0, cs, m) + 0.001 * length(vec2(dx, dy));
+			considerMotionCandidate(m, score, bestM, best, second, hasSecond);
+		}
+
+	float matchQuality = 1.0 - smoothstep(0.025, 0.12, best);
+	float uniqueness = hasSecond
+		? smoothstep(0.003, 0.03, max(second - best, 0.0))
+		: 0.0;
+	float textureConfidence = smoothstep(0.001, 0.015, variance);
+	float motionPixels = length(bestM * vec2(textureSize(curTex, 0)));
+	float textureGate = mix(0.35 + 0.65 * textureConfidence,
+		1.0, smoothstep(0.5, 2.0, motionPixels));
+	float confidence = clamp(
+		matchQuality * (0.65 + 0.35 * uniqueness) * textureGate,
+		0.0, 1.0);
+
+	// xy = motion vector, z = match residual, w = confidence (0..1).
+	imageStore(outImage, cell, vec4(bestM, best, confidence));
+}
+)";'''
+
     # Validate every source-edit anchor before copying files or changing the build tree.
     preflight_anchors = (
         (cmake, 'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'),
@@ -126,6 +271,7 @@ def main() -> None:
         (context_h, '#include "vulkan.h"\n'),
         (context_h, '\tbool fgRealPending = false;\n'),
         (frame_gen_cpp, old_fragment),
+        (frame_gen_cpp, fine_shader_old),
         (shaders_cpp, quad_fragment_original),
         (shaders_cpp, 'vk::UniqueShaderModule ShaderManager::compileQuadFragmentShader(bool ignoreTexAlpha)\n'),
         (shaders_h, 'vk::ShaderModule GetQuadFragmentShader(bool ignoreTexAlpha)\n'),
@@ -216,6 +362,8 @@ def main() -> None:
         '\tfgStreak = 0;\n'
         '#endif\n\ttry\n\t{'
     )
+
+    replace_once(frame_gen_cpp, fine_shader_old, fine_shader_new)
 
     # The existing frame-generation fragment shader is the only safe insertion point
     # without introducing another offscreen target or a CPU readback.
@@ -512,8 +660,12 @@ void main()
     missing_hooks = [hook for hook in required_hooks if hook not in integrated_context]
     if missing_hooks:
         raise SystemExit("Renderer integration incomplete; missing hooks: " + ", ".join(missing_hooks))
-    if "Mini-DLSS spatial finishing pass" not in frame_gen_cpp.read_text(encoding="utf-8"):
+    integrated_frame_gen = frame_gen_cpp.read_text(encoding="utf-8")
+    if "Mini-DLSS spatial finishing pass" not in integrated_frame_gen:
         raise SystemExit("Mini-DLSS spatial finishing pass was not installed.")
+    for marker in ("considerMotionCandidate", "textureConfidence", "disocclusionReject", "mo.w"):
+        if marker not in integrated_frame_gen:
+            raise SystemExit("ANR-inspired confidence-aware frame generation is incomplete: " + marker)
     if "quadMiniDlssDrawer->Draw" not in integrated_context:
         raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
