@@ -102,7 +102,7 @@ def main() -> None:
 \t\t    abs(lumaB - dot(west, vec3(0.2126, 0.7152, 0.0722)))));
 \tfloat edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
 \tvec3 average = (n + s + e + west) * 0.25;
-\tvec3 sharpened = base + (base - average) * (0.28 * edgeGate);
+\tvec3 sharpened = base + (base - average) * (0.12 * edgeGate);
 \tvec3 lo = min(base, min(min(n, s), min(e, west)));
 \tvec3 hi = max(base, max(max(n, s), max(e, west)));
 \tsourceColor.rgb = clamp(sharpened, max(lo - vec3(0.035), vec3(0.0)), min(hi + vec3(0.035), vec3(1.0)));
@@ -614,15 +614,15 @@ void main()
     )
 
     # Independent switches: WHAT'S NEXT controls generated frames; Mini-DLSS controls
-    # spatial sharpening on ordinary and generated frames. Default internal resolution is
-    # raised by 10% (480p -> 528p); the matching menu choice is added below.
+    # spatial sharpening on ordinary and generated frames. Keep the default internal
+    # resolution at the upstream 480p baseline to avoid silently increasing GPU load.
     replace_once(option_cpp,
         'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n',
         'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n'
         'Option<bool> MiniDLSS("rend.MiniDLSS", true);\n')
     replace_once(option_cpp,
         'Option<int> RenderResolution("rend.Resolution", 480);',
-        'Option<int> RenderResolution("rend.Resolution", 720);')
+        'Option<int> RenderResolution("rend.Resolution", 480);')
     replace_once(option_h,
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\n',
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\nextern Option<bool> MiniDLSS;\n')
@@ -644,13 +644,13 @@ void main()
     replace_once(context_cpp,
         'const bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode',
         'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
-    # Use a stronger but locally bounded spatial finish and a 1.5x internal-resolution default.
+    # Use a conservative, locally bounded spatial finish; do not raise the default render resolution.
     shaders_cpp_text = shaders_cpp.read_text(encoding="utf-8")
     strength_anchors = ("0.12 * edgeGate", "0.132 * edgeGate", "0.28 * edgeGate")
     strength_matches = [anchor for anchor in strength_anchors if shaders_cpp_text.count(anchor) == 1]
     if len(strength_matches) != 1:
         raise SystemExit("Expected exactly one ordinary-frame Mini-DLSS strength constant; found: " + ", ".join(strength_matches))
-    shaders_cpp_text = shaders_cpp_text.replace(strength_matches[0], "0.28 * edgeGate", 1)
+    shaders_cpp_text = shaders_cpp_text.replace(strength_matches[0], "0.12 * edgeGate", 1)
     shaders_cpp.write_text(shaders_cpp_text, encoding="utf-8")
 
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
