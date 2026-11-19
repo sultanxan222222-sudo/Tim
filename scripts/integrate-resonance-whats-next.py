@@ -102,14 +102,18 @@ def main() -> None:
 \t\t    abs(lumaB - dot(s, vec3(0.2126, 0.7152, 0.0722)))),
 \t\tmax(abs(lumaB - dot(e, vec3(0.2126, 0.7152, 0.0722))),
 \t\t    abs(lumaB - dot(west, vec3(0.2126, 0.7152, 0.0722)))));
-\tfloat edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
+\tfloat edgeLow = max(pushConstants.color.r * 0.35, 0.004);
+\tfloat edgeHigh = max(pushConstants.color.r * 1.5, edgeLow + 0.01);
+\tfloat edgeGate = 1.0 - smoothstep(edgeLow, edgeHigh, edge);
 \tvec3 average = (n + s + e + west) * 0.25;
-\tvec3 sharpened = base + (base - average) * (0.12 * edgeGate);
+\tvec3 sharpened = base + (base - average) * (clamp(pushConstants.color.a, 0.0, 0.25) * edgeGate);
 \tvec3 lo = min(base, min(min(n, s), min(e, west)));
 \tvec3 hi = max(base, max(max(n, s), max(e, west)));
 \tsourceColor.rgb = clamp(sharpened, max(lo - vec3(0.035), vec3(0.0)), min(hi + vec3(0.035), vec3(1.0)));
 #endif
-#if IGNORE_TEX_ALPHA == 1
+#if MINI_DLSS == 1
+\tFragColor = vec4(sourceColor.rgb, 1.0);
+#elif IGNORE_TEX_ALPHA == 1
 \tFragColor.rgb = pushConstants.color.rgb * sourceColor.rgb;
 \tFragColor.a = pushConstants.color.a;
 #else
@@ -372,7 +376,7 @@ void main()
     replace_once(
         context_cpp,
         '#include "frame_gen.h"\n',
-        '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/gpu_timestamp_math.hpp"\n'
+        '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/gpu_timestamp_math.hpp"\n#include "whats_next/render_budget_controller.hpp"\n'
     )
     replace_once(
         context_cpp,
@@ -381,6 +385,7 @@ void main()
         '\tgpuTimestampPeriodNs = physicalDeviceProperties.limits.timestampPeriod;\n'
         '\tgpuTimestampSupported = physicalDeviceProperties.limits.timestampComputeAndGraphics &&\n'
         '\t\tgpuTimestampValidBits > 0 && gpuTimestampPeriodNs > 0.0 && gpuTimestampPeriodNs < 1.0e9;\n'
+        '\twhatsNextRenderBudget.reset(whats_next::RenderQuality::Quality);\n'
         '\tNOTICE_LOG(RENDERER, "GPU timestamps %s (valid bits %u, period %.3f ns)",\n'
         '\t\tgpuTimestampSupported ? "available" : "unavailable", gpuTimestampValidBits, gpuTimestampPeriodNs);\n'
         '\tif (graphicsQueueIndex == presentQueueIndex)\n'
@@ -509,7 +514,7 @@ void main()
     replace_once(
         context_h,
         '#include "vulkan.h"\n',
-        '#include "vulkan.h"\n#include "whats_next/frame_generation_bridge.hpp"\n'
+        '#include "vulkan.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/render_budget_controller.hpp"\n'
     )
 
     replace_once(
@@ -546,6 +551,16 @@ void main()
         '\t\t\t\ttimestamps[0], timestamps[1], gpuTimestampValidBits, gpuTimestampPeriodNs, frameMs)) {\n'
         '\t\t\tlastGpuFrameTimeMs = frameMs;\n'
         '\t\t\tlastGpuFrameTimeValid = true;\n'
+        '\t\t\tconst auto previousQuality = whatsNextRenderBudget.quality();\n'
+        '\t\t\tconst double frameBudgetMs = (config::Broadcast == 1 || config::Broadcast == 3)\n'
+        '\t\t\t\t\t? 20.0 : (1000.0 / 59.94);\n'
+        '\t\t\tconst auto currentQuality = whatsNextRenderBudget.update(frameMs, frameBudgetMs, true);\n'
+        '\t\t\tif (currentQuality != previousQuality) {\n'
+        '\t\t\t\tconst char* qualityName = currentQuality == whats_next::RenderQuality::Eco ? "eco" :\n'
+        '\t\t\t\t\t\t(currentQuality == whats_next::RenderQuality::Balanced ? "balanced" : "quality");\n'
+        '\t\t\t\tNOTICE_LOG(RENDERER, "WHAT\\'S NEXT adaptive quality: %s (GPU %.2f ms / %.2f ms budget)",\n'
+        '\t\t\t\t\t\tqualityName, frameMs, frameBudgetMs);\n'
+        '\t\t\t}\n'
         '\t\t}\n'
         '\t}\n'
         '\tdevice->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);'
@@ -562,7 +577,7 @@ void main()
         '\tassert(!rendering);'
     )
     bridge_gate = '''&& fgPrevExtent == extent;
-		const bool eligible = interpolate;
+		const bool eligible = interpolate && whats_next::RenderBudgetController::profile(whatsNextRenderBudget.quality()).temporal_effects_allowed;
 		if ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
 		{
 			++fgResourceGeneration;
@@ -735,6 +750,8 @@ void main()
         context_cpp,
         '\tif (config::Rotate90)\n\t\tquadRotatePipeline->BindPipeline(commandBuffer);\n\telse\n\t\tquadPipeline->BindPipeline(commandBuffer);\n',
         '#ifdef __ORBIS__\n'
+        '\tconst auto miniDlssProfile = whats_next::RenderBudgetController::profile(whatsNextRenderBudget.quality());\n'
+        '\tconst float miniDlssPushConstants[4] = { miniDlssProfile.edge_threshold, 1.0f, 1.0f, miniDlssProfile.sharpening_strength };\n'
         '\tconst bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode\n'
         '\t\t\t&& !gui_is_open() && !(fgDraw && frameGen != nullptr);\n'
         '\tif (miniDlssActive && config::Rotate90)\n'
@@ -754,9 +771,9 @@ void main()
         '\tif (fgDraw && frameGen != nullptr)\n\t\tframeGen->Draw(commandBuffer, *renderPass);\n'
         '#ifdef __ORBIS__\n'
         '\telse if (miniDlssActive && config::Rotate90)\n'
-        '\t\tquadRotateMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '\t\tquadRotateMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation, miniDlssPushConstants);\n'
         '\telse if (miniDlssActive)\n'
-        '\t\tquadMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '\t\tquadMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation, miniDlssPushConstants);\n'
         '#endif\n'
         '\telse if (config::Rotate90)\n'
         '\t\tquadRotateDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
@@ -787,6 +804,7 @@ void main()
         context_h,
         '\tbool renderDone = false;',
         '\tbool renderDone = false;\n'
+        '\twhats_next::RenderBudgetController whatsNextRenderBudget;\n'
         '\tbool gpuTimestampSupported = false;\n'
         '\tbool gpuTimestampRecording = false;\n'
         '\tbool lastGpuFrameTimeValid = false;\n'
