@@ -21,9 +21,15 @@ public:
         std::uint64_t game_session,
         PresentationCadence cadence) noexcept;
 
-    // Call only after the real source frame has been accepted by the renderer.
+    // Call only after the source frame's command buffer has been accepted for
+    // submission. This commits CPU-side history bookkeeping; it does not claim
+    // that the GPU has finished executing the submitted work.
     // Call for real frames even when generation was rejected, so history can recover.
     void commit_real_frame() noexcept;
+
+    // Call when recording/presentation is abandoned before successful submission.
+    // The previous accepted history stays intact and this source frame ID is reused.
+    void abort_real_frame() noexcept;
 
     // Call on renderer teardown, game switch, or any resource/session reset.
     void reset() noexcept;
