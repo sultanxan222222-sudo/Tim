@@ -68,3 +68,15 @@ The previous PS3 porting investigation is relevant as an engineering discipline 
 ### Validation cases required before enabling the stack by default
 
 Static scene; slow camera pan; fast pan; thin geometry; particles/transparency; HUD; scene cut; resize/swapchain recreation; menu open/close; frame skip; GPU overload; interrupted/aborted present; and repeated vblank with no new source image. Capture image artifacts, GPU time, memory use, frame pacing and controller latency for each case.
+
+
+## Renderer transaction hardening
+
+The renderer adapter now exposes an explicit source-frame abort operation in addition to begin and commit:
+
+- A frame is committed to CPU-side temporal history only after `EndFrame(overlayCmdBuffer)` returns successfully, which is the current renderer's command-buffer submission acceptance point. This is **not** a claim that GPU execution has completed.
+- If the present path exits through the existing `InvalidVulkanContext` recovery path before submission, the pending frame is aborted. The previous accepted history remains valid and the next attempt reuses the same source-frame ID.
+- A second begin without either commit or abort remains a lifecycle violation and clears history fail-closed.
+- WHAT'S NEXT frame generation and Mini-DLSS spatial finishing are both disabled by default in the PS4 integration. They remain explicit user opt-ins until console image-quality, frame-pacing, memory and input-latency tests pass.
+
+Host regression tests now cover explicit abort/retry, resource-generation changes during an aborted frame, and adapter-level abort behavior. The overlay workflow also checks the renderer hook order and compiles the adapter source. The revised integration still requires a fresh CI run and real PS4 Pro validation; neither is claimed by this source change.
