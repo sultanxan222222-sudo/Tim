@@ -266,7 +266,7 @@ void main()
         (context_cpp, 'if (graphicsQueueIndex == presentQueueIndex)\n'),
         (context_cpp, 'void VulkanContext::NewFrame()\n{'),
         (context_cpp, 'commandBuffer.endRenderPass();\n\tcommandBuffer.end();'),
-        (context_cpp, 'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);'),
+        (context_cpp, 'device->resetFences(*drawFences[currentImage]);\n\tgraphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);'),
         (context_h, '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);'),
         (context_h, '\tbool renderDone = false;'),
         (context_h, '\tstd::vector<vk::UniqueFence> drawFences;'),
@@ -608,8 +608,24 @@ void main()
     )
     replace_once(
         context_cpp,
-        'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);',
-        'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n'
+        'device->resetFences(*drawFences[currentImage]);\n\tgraphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);',
+        'try {\n'
+        '\t\tdevice->resetFences(*drawFences[currentImage]);\n'
+        '\t\tgraphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n'
+        '\t} catch (const vk::SystemError& err) {\n'
+        '\t\tWARN_LOG(RENDERER, "Vulkan frame submission failed: %s", err.what());\n'
+        '\t\tgpuTimestampRecording = false;\n'
+        '\t\tif (currentImage < gpuTimestampPending.size()) gpuTimestampPending[currentImage] = 0;\n'
+        '\t\ttry {\n'
+        '\t\t\t// A failed submit leaves the reset fence unsignaled. Replace it with a signaled fence\n'
+        '\t\t\t// so swapchain recovery cannot block forever waiting for work that was never queued.\n'
+        '\t\t\tdrawFences[currentImage] = device->createFenceUnique(\n'
+        '\t\t\t\t\tvk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));\n'
+        '\t\t} catch (const vk::SystemError& fenceErr) {\n'
+        '\t\t\tWARN_LOG(RENDERER, "Could not restore signaled frame fence: %s", fenceErr.what());\n'
+        '\t\t}\n'
+        '\t\tthrow InvalidVulkanContext();\n'
+        '\t}\n'
         '\tif (gpuTimestampRecording && currentImage < gpuTimestampPending.size())\n'
         '\t\tgpuTimestampPending[currentImage] = 1;\n'
         '\tgpuTimestampRecording = false;\n'
@@ -948,6 +964,21 @@ void main()
         raise SystemExit("GPU timestamp results may be read before the reacquired image fence.")
     if idle_wait > pool_destroy or pool_destroy > pool_create:
         raise SystemExit("GPU timestamp query pools may be destroyed before idle or recreated before cleanup.")
+
+    # A reset fence must never be left unsignaled when queue submission fails:
+    # swapchain recreation waits on every per-image fence and would otherwise hang.
+    reset_fence = integrated_context.find("device->resetFences(*drawFences[currentImage]);")
+    submit_call = integrated_context.find("graphicsQueue.submit(submitInfo, *drawFences[currentImage]);")
+    recovery_fence = integrated_context.find("drawFences[currentImage] = device->createFenceUnique(")
+    signaled_recovery = integrated_context.find("vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled)", recovery_fence)
+    submit_catch = integrated_context.find("Vulkan frame submission failed:")
+    if min(reset_fence, submit_call, recovery_fence, signaled_recovery, submit_catch) < 0:
+        raise SystemExit("Failed-submit fence recovery is incomplete; refusing renderer integration.")
+    if not (reset_fence < submit_call < submit_catch < recovery_fence < signaled_recovery):
+        raise SystemExit("Failed-submit fence recovery order is unsafe.")
+    submit_pending = integrated_context.find("gpuTimestampPending[currentImage] = 1;", submit_call)
+    if submit_pending < submit_call:
+        raise SystemExit("GPU timestamp pending state is published before accepted queue submission.")
 
     # Unsupported queues and failed query-pool creation must disable measurement
     # without affecting rendering or changing the user's selected effects.
