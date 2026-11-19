@@ -7,8 +7,8 @@ using namespace whats_next;
 int main() {
     ResonanceFrameAdapter adapter;
 
-    // The adapter must translate the renderer's refresh interval count into
-    // the policy cadence without inventing a generated frame for the first image.
+    // Translate refresh interval counts into policy cadence. The first real
+    // image only seeds history and must not invent a generated frame.
     auto decision = adapter.begin_source_frame(
         true, 1280, 720, PixelFormat::RGBA8, 1, 7, 2);
     assert(decision == FrameGenerationDecision::PresentRealFirstFrame);
@@ -19,7 +19,18 @@ int main() {
     assert(decision == FrameGenerationDecision::GenerateIntermediate);
     adapter.commit_source_frame();
 
-    // A resource generation change invalidates the old history; the next
+    // A recording abort must preserve the last accepted source frame and reuse
+    // the same source ID when the renderer retries this frame.
+    decision = adapter.begin_source_frame(
+        true, 1280, 720, PixelFormat::RGBA8, 1, 7, 2);
+    assert(decision == FrameGenerationDecision::GenerateIntermediate);
+    adapter.abort_source_frame();
+    decision = adapter.begin_source_frame(
+        true, 1280, 720, PixelFormat::RGBA8, 1, 7, 2);
+    assert(decision == FrameGenerationDecision::GenerateIntermediate);
+    adapter.commit_source_frame();
+
+    // Resource generation change invalidates the old history; the next
     // accepted real frame seeds the replacement history.
     decision = adapter.begin_source_frame(
         true, 1280, 720, PixelFormat::RGBA8, 2, 7, 2);
@@ -42,8 +53,7 @@ int main() {
     assert(decision == FrameGenerationDecision::PresentRealFirstFrame);
     adapter.commit_source_frame();
 
-    // Disabled mode must bypass generation while still allowing source frames
-    // to be committed so the renderer can recover when the toggle is re-enabled.
+    // Disabled mode still commits real frames, so history recovers when enabled.
     decision = adapter.begin_source_frame(
         false, 1280, 720, PixelFormat::RGBA8, 2, 8, 2);
     assert(decision == FrameGenerationDecision::BypassDisabled);
