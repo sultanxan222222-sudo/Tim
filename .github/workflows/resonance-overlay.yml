@@ -78,6 +78,10 @@ jobs:
           grep -q 'vk::PipelineStageFlagBits::eTopOfPipe' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'vk::PipelineStageFlagBits::eBottomOfPipe' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'GetLastGpuFrameTimeMs' /tmp/flycast/core/rend/vulkan/vulkan_context.h
+          for symbol in vkCreateQueryPool vkDestroyQueryPool vkGetQueryPoolResults vkCmdResetQueryPool vkCmdWriteTimestamp; do
+            grep -q "$symbol" /tmp/flycast/core/deps/libretro-common/vulkan/vulkan_symbol_wrapper.c
+            grep -q "$symbol" /tmp/flycast/core/deps/libretro-common/include/vulkan/vulkan_symbol_wrapper.h
+          done
           grep -q 'render_budget_controller.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
       - name: Compile WHAT'S NEXT renderer bridge sources
         run: |
