@@ -939,7 +939,7 @@ void main()
         "commandBuffer.resetQueryPool(",
         "commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe",
         "commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe",
-        "graphicsQueue.submit(submitInfo, *drawFences[currentImage]);",
+        "graphicsQueue.submit(submitInfo, *submittedFence);",
         "gpuTimestampPending[currentImage] = 1;",
     )
     timestamp_positions = [integrated_context.find(marker) for marker in timestamp_order]
