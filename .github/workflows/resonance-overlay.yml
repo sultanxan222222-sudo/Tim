@@ -54,10 +54,19 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           context = Path('/tmp/flycast/core/rend/vulkan/vulkan_context.cpp').read_text()
-          accepted = "EndFrame(overlayCmdBuffer);\n\t\t\twhatsNextBridge.commit_real_frame();"
+          header = Path('/tmp/flycast/core/rend/vulkan/vulkan_context.h').read_text()
+          accepted = ("if (EndFrame(overlayCmdBuffer))\n"
+                      "\t\t\t\twhatsNextBridge.commit_real_frame();\n"
+                      "\t\t\telse\n"
+                      "\t\t\t\twhatsNextBridge.abort_real_frame();")
           aborted = "} catch (const InvalidVulkanContext&) {\n\t\t\twhatsNextBridge.abort_real_frame();"
+          signature = 'bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)'
           if accepted not in context:
-              raise SystemExit('source-frame history must commit only after EndFrame submission')
+              raise SystemExit('source-frame history must branch on EndFrame submission success')
+          if signature not in context or 'return false;' not in context or 'return true;' not in context:
+              raise SystemExit('EndFrame must return an explicit submission-success boolean')
+          if 'bool EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());' not in header:
+              raise SystemExit('EndFrame declaration must use the boolean submission result')
           if aborted not in context:
               raise SystemExit('abandoned PresentFrame must abort its pending source-frame transaction')
           PY
