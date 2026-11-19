@@ -20,7 +20,7 @@ int main() {
 
     // The 64-bit path must not shift by 64 when constructing a mask.
     assert(gpu_timestamp_delta_ms(0xFFFFFFFFFFFFFFF0ull, 0x10ull, 64, 1000.0, ms));
-    assert(std::abs(ms - 0.048) < 1e-9);
+    assert(std::abs(ms - 0.032) < 1e-9);
 
     // Unsupported and malformed measurements must fail closed.
     assert(!gpu_timestamp_delta_ms(1, 2, 0, 10.0, ms));
