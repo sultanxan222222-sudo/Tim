@@ -934,6 +934,27 @@ void main()
     timestamp_positions = [integrated_context.find(marker) for marker in timestamp_order]
     if any(position < 0 for position in timestamp_positions) or timestamp_positions != sorted(timestamp_positions):
         raise SystemExit("GPU timestamp query lifecycle is out of order; refusing unsafe renderer integration.")
+
+    # Query results are consumed only after the fence for the reacquired image.
+    # The old swapchain's pools are destroyed only after device.waitIdle().
+    fence_wait = integrated_context.find("device->waitForFences(*drawFences[currentImage]")
+    result_read = integrated_context.find("device->getQueryPoolResults(")
+    idle_wait = integrated_context.find("device->waitIdle();")
+    pool_destroy = integrated_context.find("gpuTimestampPools.clear();")
+    pool_create = integrated_context.find("device->createQueryPoolUnique(")
+    if min(fence_wait, result_read, idle_wait, pool_destroy, pool_create) < 0:
+        raise SystemExit("GPU timestamp fence/pool lifecycle is incomplete.")
+    if fence_wait > result_read:
+        raise SystemExit("GPU timestamp results may be read before the reacquired image fence.")
+    if idle_wait > pool_destroy or pool_destroy > pool_create:
+        raise SystemExit("GPU timestamp query pools may be destroyed before idle or recreated before cleanup.")
+
+    # Unsupported queues and failed query-pool creation must disable measurement
+    # without affecting rendering or changing the user's selected effects.
+    for marker in ("gpuTimestampValidBits > 0", "gpuTimestampPeriodNs > 0.0",
+                   "gpuTimestampSupported = false;", "gpuTimestampPending[currentImage] = 0;"):
+        if marker not in integrated_context:
+            raise SystemExit("GPU timestamp fail-closed handling is incomplete: " + marker)
     if "GetLastGpuFrameTimeMs(double& milliseconds) const" not in context_h.read_text(encoding="utf-8"):
         raise SystemExit("The Vulkan renderer does not expose completed GPU frame-time samples.")
     if "quadMiniDlssDrawer->Draw" not in integrated_context:
