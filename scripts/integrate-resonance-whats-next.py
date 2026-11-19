@@ -256,7 +256,6 @@ void main()
     preflight_anchors = (
         (cmake, 'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'),
         (cmake, '            frame_gen.cpp\n'),
-        (cmake, '            whats_next/src/render_budget_controller.cpp\n'),
         (context_cpp, '#include "frame_gen.h"\n'),
         (context_cpp, 'imageViews.resize(swapChainImages.size());\n\t\tcommandPools.reserve(swapChainImages.size());'),
         (context_cpp, 'device->waitIdle();\n\n\t\tif (!drawFences.empty())'),
