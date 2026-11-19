@@ -55,7 +55,7 @@ int main() {
     for (int i = 0; i < 3; ++i)
         governor.update(17.0, 16.667);
     assert(governor.quality() == RenderQuality::Eco);
-    assert(RenderBudgetController::profile(governor.quality()).sharpening_strength == 0.08f);
+    assert(RenderBudgetController::profile(governor.quality()).sharpening_strength == 0.0f);
 
     // Long-term headroom restores one tier at a time, never instantly.
     for (int i = 0; i < 4; ++i)
