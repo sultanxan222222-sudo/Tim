@@ -610,20 +610,15 @@ void main()
         context_cpp,
         'device->resetFences(*drawFences[currentImage]);\n\tgraphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);',
         'try {\n'
-        '\t\tdevice->resetFences(*drawFences[currentImage]);\n'
-        '\t\tgraphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n'
+        '\t\t// Keep the waited, signaled fence intact until queue submission succeeds.\n'
+        '\t\tauto submittedFence = device->createFenceUnique(vk::FenceCreateInfo());\n'
+        '\t\tgraphicsQueue.submit(submitInfo, *submittedFence);\n'
+        '\t\tdrawFences[currentImage] = std::move(submittedFence);\n'
         '\t} catch (const vk::SystemError& err) {\n'
         '\t\tWARN_LOG(RENDERER, "Vulkan frame submission failed: %s", err.what());\n'
         '\t\tgpuTimestampRecording = false;\n'
         '\t\tif (currentImage < gpuTimestampPending.size()) gpuTimestampPending[currentImage] = 0;\n'
-        '\t\ttry {\n'
-        '\t\t\t// A failed submit leaves the reset fence unsignaled. Replace it with a signaled fence\n'
-        '\t\t\t// so swapchain recovery cannot block forever waiting for work that was never queued.\n'
-        '\t\t\tdrawFences[currentImage] = device->createFenceUnique(\n'
-        '\t\t\t\t\tvk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled));\n'
-        '\t\t} catch (const vk::SystemError& fenceErr) {\n'
-        '\t\t\tWARN_LOG(RENDERER, "Could not restore signaled frame fence: %s", fenceErr.what());\n'
-        '\t\t}\n'
+        '\t\t// The original fence remains signaled; the unsubmitted temporary fence is discarded.\n'
         '\t\tthrow InvalidVulkanContext();\n'
         '\t}\n'
         '\tif (gpuTimestampRecording && currentImage < gpuTimestampPending.size())\n'
@@ -965,17 +960,19 @@ void main()
     if idle_wait > pool_destroy or pool_destroy > pool_create:
         raise SystemExit("GPU timestamp query pools may be destroyed before idle or recreated before cleanup.")
 
-    # A reset fence must never be left unsignaled when queue submission fails:
-    # swapchain recreation waits on every per-image fence and would otherwise hang.
-    reset_fence = integrated_context.find("device->resetFences(*drawFences[currentImage]);")
-    submit_call = integrated_context.find("graphicsQueue.submit(submitInfo, *drawFences[currentImage]);")
-    recovery_fence = integrated_context.find("drawFences[currentImage] = device->createFenceUnique(")
-    signaled_recovery = integrated_context.find("vk::FenceCreateInfo(vk::FenceCreateFlagBits::eSignaled)", recovery_fence)
+    # Preserve the old signaled fence until submission is accepted. A temporary
+    # unsignaled fence is moved into the image slot only after vkQueueSubmit succeeds.
+    submit_try = integrated_context.find("auto submittedFence = device->createFenceUnique(vk::FenceCreateInfo());")
+    submit_call = integrated_context.find("graphicsQueue.submit(submitInfo, *submittedFence);")
+    fence_publish = integrated_context.find("drawFences[currentImage] = std::move(submittedFence);")
     submit_catch = integrated_context.find("Vulkan frame submission failed:")
-    if min(reset_fence, submit_call, recovery_fence, signaled_recovery, submit_catch) < 0:
-        raise SystemExit("Failed-submit fence recovery is incomplete; refusing renderer integration.")
-    if not (reset_fence < submit_call < submit_catch < recovery_fence < signaled_recovery):
-        raise SystemExit("Failed-submit fence recovery order is unsafe.")
+    reset_fence = integrated_context.find("device->resetFences(*drawFences[currentImage]);")
+    if min(submit_try, submit_call, fence_publish, submit_catch) < 0:
+        raise SystemExit("Transactional frame-fence submission is incomplete; refusing renderer integration.")
+    if not (submit_try < submit_call < fence_publish < submit_catch):
+        raise SystemExit("Frame fence is published before successful queue submission.")
+    if reset_fence >= 0:
+        raise SystemExit("Renderer still resets the live image fence before queue submission.")
     submit_pending = integrated_context.find("gpuTimestampPending[currentImage] = 1;", submit_call)
     if submit_pending < submit_call:
         raise SystemExit("GPU timestamp pending state is published before accepted queue submission.")
