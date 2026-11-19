@@ -84,9 +84,9 @@ void RenderBudgetController::reset(RenderQuality initial) noexcept {
 RenderQualityProfile RenderBudgetController::profile(RenderQuality quality) noexcept {
     switch (quality) {
     case RenderQuality::Eco:
-        return {0.08f, 0.11f, false};
+        return {0.0f, 0.11f, false};
     case RenderQuality::Quality:
-        return {0.20f, 0.045f, true};
+        return {0.12f, 0.045f, true};
     case RenderQuality::Balanced:
     default:
         return {0.12f, 0.075f, false};
