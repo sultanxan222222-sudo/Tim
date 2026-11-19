@@ -866,7 +866,7 @@ void main()
         'const float scales[] = { 1.f, 1.1f, 1.5f, 2.f, 3.f, 4.f };')
     replace_once(context_cpp,
         'const bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode',
-        'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
+        'const bool miniDlssActive = config::MiniDLSS && miniDlssProfile.sharpening_strength > 0.0f && !settings.input.fastForwardMode')
     # The ordinary-frame Mini-DLSS shader now receives its strength and edge threshold
     # from the live render-budget profile through the existing push constants. Keep
     # this dynamic mapping instead of overwriting it with a fixed sharpening constant.
