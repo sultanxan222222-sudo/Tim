@@ -24,6 +24,10 @@ void ResonanceFrameAdapter::commit_source_frame() noexcept {
     bridge_.commit_real_frame();
 }
 
+void ResonanceFrameAdapter::abort_source_frame() noexcept {
+    bridge_.abort_real_frame();
+}
+
 void ResonanceFrameAdapter::reset() noexcept {
     bridge_.reset();
 }
