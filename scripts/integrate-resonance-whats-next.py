@@ -919,6 +919,21 @@ void main()
     for marker in ("gpuTimestampPools", "vk::PipelineStageFlagBits::eTopOfPipe", "vk::PipelineStageFlagBits::eBottomOfPipe", "gpuTimestampPending[currentImage] = 1;", "whatsNextRenderBudget.update", "temporal_effects_allowed", "miniDlssProfile.sharpening_strength", "miniDlssProfile.sharpening_strength > 0.0f", "miniDlssPushConstants"):
         if marker not in integrated_context:
             raise SystemExit("Vulkan GPU timestamp lifecycle is incomplete: " + marker)
+    # Enforce the timestamp lifecycle order in the generated renderer, not merely
+    # the presence of API names. Results must be consumed before re-recording,
+    # both stage markers must bracket the frame, and pending state is published
+    # only after queue submission has been accepted.
+    timestamp_order = (
+        "device->getQueryPoolResults(",
+        "commandBuffer.resetQueryPool(",
+        "commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe",
+        "commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe",
+        "graphicsQueue.submit(submitInfo, *drawFences[currentImage]);",
+        "gpuTimestampPending[currentImage] = 1;",
+    )
+    timestamp_positions = [integrated_context.find(marker) for marker in timestamp_order]
+    if any(position < 0 for position in timestamp_positions) or timestamp_positions != sorted(timestamp_positions):
+        raise SystemExit("GPU timestamp query lifecycle is out of order; refusing unsafe renderer integration.")
     if "GetLastGpuFrameTimeMs(double& milliseconds) const" not in context_h.read_text(encoding="utf-8"):
         raise SystemExit("The Vulkan renderer does not expose completed GPU frame-time samples.")
     if "quadMiniDlssDrawer->Draw" not in integrated_context:
