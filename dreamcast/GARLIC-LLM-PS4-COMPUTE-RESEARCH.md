@@ -98,3 +98,17 @@ Garlic LLM's own code is GPL-3.0; the model weights and bundled third-party comp
 - [MTP/speculative decoding and packed low-bit kernels](https://github.com/leonardo-alegria/garlic-llm/blob/main/chat/engine_spec.inc)
 - [Project licence](https://github.com/leonardo-alegria/garlic-llm/blob/main/LICENSE)
 - [PS4 Onion/Garlic memory-path background](https://pc.watch.impress.co.jp/docs/column/kaigai/621178.html)
+
+
+## Applied to WHAT'S NEXT: Vulkan GPU timing
+
+The first practical adaptation is now implemented as an independent Vulkan-side helper and renderer overlay, rather than copying Garlic's PM4/GNM submission code:
+
+- `gpu_timestamp_math.hpp/.cpp` converts timestamp deltas using the Vulkan queue family's `timestampValidBits` and the physical device's `timestampPeriod`. It rejects invalid periods, unsupported counters, zero deltas and implausible values, and handles counter wraparound.
+- The conversion helper has host regression tests for ordinary values, 32-bit wraparound, 64-bit wraparound and invalid measurements. The local strict-warning host test run passed.
+- The overlay allocates two Vulkan timestamp queries per swapchain image, records TOP_OF_PIPE and BOTTOM_OF_PIPE timestamps in the renderer's own command buffer, and marks a pair pending only after the graphics queue accepts that command buffer.
+- Query results are read only when Flycast reacquires that same swapchain image after its associated fence wait. No separate wait-for-query or device-wide idle is added to the frame loop.
+- Query-pool allocation/result errors disable measurement and leave the original renderer path available. The timestamp getter exposes completed samples to a future adaptive controller.
+- The adaptive render-budget controller is **not yet driven** by these samples, and no quality/resolution changes are enabled automatically.
+
+This is an implementation of Garlic's useful *measurement and completion discipline* using the renderer's existing Vulkan queue and fences. It deliberately does not execute Garlic PM4 packets in the Vulkan frame path. The overlay still needs a fresh CI run and validation on an actual PS4 Pro; host tests do not prove console timestamp support or correct GPU results.
