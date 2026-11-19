@@ -867,14 +867,13 @@ void main()
     replace_once(context_cpp,
         'const bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode',
         'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
-    # Use a conservative, locally bounded spatial finish; do not raise the default render resolution.
+    # The ordinary-frame Mini-DLSS shader now receives its strength and edge threshold
+    # from the live render-budget profile through the existing push constants. Keep
+    # this dynamic mapping instead of overwriting it with a fixed sharpening constant.
     shaders_cpp_text = shaders_cpp.read_text(encoding="utf-8")
-    strength_anchors = ("0.12 * edgeGate", "0.132 * edgeGate", "0.28 * edgeGate")
-    strength_matches = [anchor for anchor in strength_anchors if shaders_cpp_text.count(anchor) == 1]
-    if len(strength_matches) != 1:
-        raise SystemExit("Expected exactly one ordinary-frame Mini-DLSS strength constant; found: " + ", ".join(strength_matches))
-    shaders_cpp_text = shaders_cpp_text.replace(strength_matches[0], "0.12 * edgeGate", 1)
-    shaders_cpp.write_text(shaders_cpp_text, encoding="utf-8")
+    for marker in ("pushConstants.color.r * 0.35", "pushConstants.color.a, 0.0, 0.25"):
+        if marker not in shaders_cpp_text:
+            raise SystemExit("Adaptive Mini-DLSS shader profile input is missing: " + marker)
 
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
     integrated_cmake = cmake.read_text(encoding="utf-8")
