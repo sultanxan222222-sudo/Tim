@@ -28,6 +28,8 @@ def main() -> None:
     root = Path(sys.argv[1]).resolve()
     context_cpp = root / "core/rend/vulkan/vulkan_context.cpp"
     context_h = root / "core/rend/vulkan/vulkan_context.h"
+    vk_symbol_wrapper_c = root / "core/deps/libretro-common/vulkan/vulkan_symbol_wrapper.c"
+    vk_symbol_wrapper_h = root / "core/deps/libretro-common/include/vulkan/vulkan_symbol_wrapper.h"
     cmake = root / "core/rend/vulkan/CMakeLists.txt"
     shaders_cpp = root / "core/rend/vulkan/shaders.cpp"
     shaders_h = root / "core/rend/vulkan/shaders.h"
@@ -37,7 +39,7 @@ def main() -> None:
     option_h = root / "core/cfg/option.h"
     settings_menu_cpp = root / "shell/ps4/launcher/settings_menu.cpp"
     quad_h = root / "core/rend/vulkan/quad.h"
-    if not all(p.is_file() for p in (context_cpp, context_h, cmake, shaders_cpp, shaders_h, quad_cpp, quad_h, frame_gen_h, option_cpp, option_h, settings_menu_cpp, root / "core/rend/vulkan/frame_gen.cpp")):
+    if not all(p.is_file() for p in (context_cpp, context_h, vk_symbol_wrapper_c, vk_symbol_wrapper_h, cmake, shaders_cpp, shaders_h, quad_cpp, quad_h, frame_gen_h, option_cpp, option_h, settings_menu_cpp, root / "core/rend/vulkan/frame_gen.cpp")):
         raise SystemExit("Not a Resonance-patched Flycast tree: required Vulkan renderer files are missing.")
 
     module = repo / "dreamcast/mini-dlss"
@@ -860,6 +862,11 @@ void main()
     if "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include" not in integrated_cmake or (chr(92) + "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include") in integrated_cmake:
         raise SystemExit("Mini-DLSS CMake include path is malformed.")
 
+    symbol_wrapper_text = vk_symbol_wrapper_c.read_text(encoding="utf-8")
+    symbol_header_text = vk_symbol_wrapper_h.read_text(encoding="utf-8")
+    for symbol in ("vkCreateQueryPool", "vkDestroyQueryPool", "vkGetQueryPoolResults", "vkCmdResetQueryPool", "vkCmdWriteTimestamp"):
+        if symbol not in symbol_wrapper_text or symbol not in symbol_header_text:
+            raise SystemExit("The pinned Vulkan symbol wrapper does not expose GPU timestamp function: " + symbol)
     integrated_context = context_cpp.read_text(encoding="utf-8")
     required_hooks = (
         "whatsNextBridge.begin_real_frame",
