@@ -10,6 +10,7 @@ This directory contains a backend-neutral C++ core for the coordinated Dreamcast
 - CPU reference block-motion estimator for tightly packed 8-bit luminance frames. It performs bounded sum-of-absolute-differences matching, rejects flat/low-texture blocks, and attaches a confidence score.
 - Host-side CMake tests for history validation and motion estimation.
 - Unintegrated Vulkan compute shader prototype for spatial edge-aware sharpening.
+- Host-tested render-budget governor with smoothed GPU-time input, overload downshifts, and slow recovery hysteresis.
 
 ## Build and test on a desktop host
 
@@ -41,7 +42,7 @@ The sanitizer option is for desktop-host validation only; it is not a PS4 build 
 
 ## Not yet implemented / limitations
 
-- No integration into Resonance/Flycast's Vulkan render pass.
+- The render-budget governor is not yet connected to a PS4 GPU timestamp source; it is a tested policy module, not an active automatic setting on-console.
 - No GPU dispatch, Vulkan descriptors, motion-vector image, depth image, or presentation scheduling is connected.
 - The motion estimator is not yet optimized for real-time PS4 use; it is a CPU baseline, not an acceptable final full-resolution path.
 - The estimator returns displacement/confidence only; it does not synthesize an intermediate frame.
@@ -70,3 +71,7 @@ the safe scheduling decision around a renderer's existing frame-generation path:
 The policy, controller, and bridge are covered by dedicated CMake/CTest targets. The bridge's renderer contract is: call `begin_real_frame()` once for each completed real frame, use the returned decision, and call `commit_real_frame()` only after the renderer accepts that real frame; call `reset()` on teardown, game switch, or resource reset.
 
 Important discovery: the actual Resonance PS4 patch already adds `core/rend/vulkan/frame_gen.cpp/.h` and hooks it into `VulkanContext::PresentFrame()` / `DrawFrame()`. It uses GPU coarse/fine motion search and an intermediate Vulkan draw. WHAT'S NEXT should connect its controller to this existing path instead of creating a second renderer. Per Triangle / Per Strip / Per Pixel are alpha-sorting settings, not frame-generation modes. This controller is a tested control layer, not a claim that it is already wired into Resonance.
+
+## Adaptive render budget policy
+
+`render_budget_controller.hpp/.cpp` is a small, allocation-free policy component. It accepts measured GPU frame time and the display-frame budget, smooths measurements with an exponential moving average, steps down after sustained overload, and requires a much longer headroom period before stepping quality back up. Invalid measurements are ignored. ECO/BALANCED/QUALITY profiles define conservative spatial finishing parameters. The controller intentionally does not guess GPU time from CPU submission time; a PS4 timestamp-query adapter must be wired and validated before automatic quality switching is enabled in the live renderer.

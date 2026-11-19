@@ -12,9 +12,10 @@ FrameGenerationDecision FrameGenerationBridge::begin_real_frame(
     std::uint64_t resource_generation,
     std::uint64_t game_session,
     PresentationCadence cadence) noexcept {
-    // A second begin without a commit means the renderer abandoned an
-    // in-flight source frame. Invalidate temporal history rather than allowing
-    // a decision made for that frame to be committed against a replacement.
+    // A second begin without a commit or explicit abort means the renderer
+    // abandoned an in-flight source frame without closing its transaction.
+    // Invalidate temporal history rather than allowing a replacement frame to
+    // inherit a decision made for the abandoned frame.
     if (pending_valid_) {
         controller_.reset();
         pending_valid_ = false;
@@ -37,8 +38,18 @@ void FrameGenerationBridge::commit_real_frame() noexcept {
     if (!pending_valid_)
         return;
     controller_.commit_real_frame(pending_);
+    pending_ = {};
     pending_valid_ = false;
     ++next_frame_id_;
+}
+
+void FrameGenerationBridge::abort_real_frame() noexcept {
+    if (!pending_valid_)
+        return;
+    // decide() is read-only with respect to accepted history. Aborting therefore
+    // only drops the tentative frame; the prior accepted frame remains usable.
+    pending_ = {};
+    pending_valid_ = false;
 }
 
 void FrameGenerationBridge::reset() noexcept {

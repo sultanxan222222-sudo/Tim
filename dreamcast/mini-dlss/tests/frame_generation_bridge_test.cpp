@@ -18,9 +18,8 @@ int main() {
     bridge.commit_real_frame();
     assert(bridge.current_frame_id() == 2);
 
-    // If the renderer begins a replacement before committing the previous
-    // source frame, temporal history must be discarded and the replacement
-    // must not inherit the old frame's generation decision.
+    // A second begin without a matching commit/abort is a lifecycle violation:
+    // reset history rather than allowing the abandoned frame to be committed late.
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 1, 1, {2});
     assert(decision == FrameGenerationDecision::GenerateIntermediate);
@@ -38,7 +37,25 @@ int main() {
     bridge.commit_real_frame();
     assert(bridge.current_frame_id() == 4);
 
-    // Resource recreation rejects the old history for exactly one source frame.
+    // Explicitly aborted source frames do not advance IDs or poison accepted history.
+    decision = bridge.begin_real_frame(
+        true, 640, 480, PixelFormat::RGBA8, 1, 1, {2});
+    assert(decision == FrameGenerationDecision::GenerateIntermediate);
+    bridge.abort_real_frame();
+    assert(bridge.current_frame_id() == 4);
+    decision = bridge.begin_real_frame(
+        true, 640, 480, PixelFormat::RGBA8, 1, 1, {2});
+    assert(decision == FrameGenerationDecision::GenerateIntermediate);
+    bridge.commit_real_frame();
+    assert(bridge.current_frame_id() == 5);
+
+    // Aborting a frame that observed a resource change keeps the last accepted
+    // history; retrying the changed resource still correctly rejects that history.
+    decision = bridge.begin_real_frame(
+        true, 640, 480, PixelFormat::RGBA8, 2, 1, {2});
+    assert(decision == FrameGenerationDecision::PresentRealHistoryRejected);
+    bridge.abort_real_frame();
+    assert(bridge.current_frame_id() == 5);
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 2, 1, {2});
     assert(decision == FrameGenerationDecision::PresentRealHistoryRejected);
@@ -65,14 +82,14 @@ int main() {
     bridge.commit_real_frame();
 
     // Reset between begin and commit must invalidate the pending source frame.
-    // A late commit from the old renderer generation must not seed history or
-    // advance the new generation's frame counter.
+    // A late commit or abort from the old renderer generation cannot seed history.
     bridge.reset();
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 10, 10, {2});
     assert(decision == FrameGenerationDecision::PresentRealFirstFrame);
     bridge.reset();
     bridge.commit_real_frame();
+    bridge.abort_real_frame();
     assert(bridge.current_frame_id() == 1);
     decision = bridge.begin_real_frame(
         true, 640, 480, PixelFormat::RGBA8, 10, 10, {2});

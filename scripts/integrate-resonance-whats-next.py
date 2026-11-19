@@ -28,6 +28,8 @@ def main() -> None:
     root = Path(sys.argv[1]).resolve()
     context_cpp = root / "core/rend/vulkan/vulkan_context.cpp"
     context_h = root / "core/rend/vulkan/vulkan_context.h"
+    vk_symbol_wrapper_c = root / "core/deps/libretro-common/vulkan/vulkan_symbol_wrapper.c"
+    vk_symbol_wrapper_h = root / "core/deps/libretro-common/include/vulkan/vulkan_symbol_wrapper.h"
     cmake = root / "core/rend/vulkan/CMakeLists.txt"
     shaders_cpp = root / "core/rend/vulkan/shaders.cpp"
     shaders_h = root / "core/rend/vulkan/shaders.h"
@@ -37,7 +39,7 @@ def main() -> None:
     option_h = root / "core/cfg/option.h"
     settings_menu_cpp = root / "shell/ps4/launcher/settings_menu.cpp"
     quad_h = root / "core/rend/vulkan/quad.h"
-    if not all(p.is_file() for p in (context_cpp, context_h, cmake, shaders_cpp, shaders_h, quad_cpp, quad_h, frame_gen_h, option_cpp, option_h, settings_menu_cpp, root / "core/rend/vulkan/frame_gen.cpp")):
+    if not all(p.is_file() for p in (context_cpp, context_h, vk_symbol_wrapper_c, vk_symbol_wrapper_h, cmake, shaders_cpp, shaders_h, quad_cpp, quad_h, frame_gen_h, option_cpp, option_h, settings_menu_cpp, root / "core/rend/vulkan/frame_gen.cpp")):
         raise SystemExit("Not a Resonance-patched Flycast tree: required Vulkan renderer files are missing.")
 
     module = repo / "dreamcast/mini-dlss"
@@ -100,32 +102,195 @@ def main() -> None:
 \t\t    abs(lumaB - dot(s, vec3(0.2126, 0.7152, 0.0722)))),
 \t\tmax(abs(lumaB - dot(e, vec3(0.2126, 0.7152, 0.0722))),
 \t\t    abs(lumaB - dot(west, vec3(0.2126, 0.7152, 0.0722)))));
-\tfloat edgeGate = 1.0 - smoothstep(0.025, 0.12, edge);
+\tfloat edgeLow = max(pushConstants.color.r * 0.35, 0.004);
+\tfloat edgeHigh = max(pushConstants.color.r * 1.5, edgeLow + 0.01);
+\tfloat edgeGate = 1.0 - smoothstep(edgeLow, edgeHigh, edge);
 \tvec3 average = (n + s + e + west) * 0.25;
-\tvec3 sharpened = base + (base - average) * (0.28 * edgeGate);
+\tvec3 sharpened = base + (base - average) * (clamp(pushConstants.color.a, 0.0, 0.25) * edgeGate);
 \tvec3 lo = min(base, min(min(n, s), min(e, west)));
 \tvec3 hi = max(base, max(max(n, s), max(e, west)));
 \tsourceColor.rgb = clamp(sharpened, max(lo - vec3(0.035), vec3(0.0)), min(hi + vec3(0.035), vec3(1.0)));
 #endif
-#if IGNORE_TEX_ALPHA == 1
+#if MINI_DLSS == 1
+\tFragColor = vec4(sourceColor.rgb, 1.0);
+#elif IGNORE_TEX_ALPHA == 1
 \tFragColor.rgb = pushConstants.color.rgb * sourceColor.rgb;
 \tFragColor.a = pushConstants.color.a;
 #else
 \tFragColor = pushConstants.color * sourceColor;
 #endif'''
 
+
+    fine_shader_old = r'''const char *const kFine = R"(
+void main()
+{
+	ivec2 cell = ivec2(gl_GlobalInvocationID.xy);
+	if (cell.x >= 160 || cell.y >= 90)
+		return;
+	vec2 cs = 1.0 / vec2(160.0, 90.0);
+	vec2 c0 = (vec2(cell) + 0.5) * cs;
+	loadCur(c0, cs);
+	// the coarse neighbours' moves, and no move
+	ivec2 cc = cell / 2;
+	float best = sad(c0, cs, vec2(0.0));
+	vec2 bestM = vec2(0.0);
+	for (int b = -1; b <= 1; b++)
+		for (int a = -1; a <= 1; a++)
+		{
+			ivec2 n = clamp(cc + ivec2(a, b), ivec2(0), ivec2(79, 44));
+			vec2 m = texelFetch(coarseTex, n, 0).xy;
+			float s = sad(c0, cs, m) + 0.002;
+			if (s < best)
+			{
+				best = s;
+				bestM = m;
+			}
+		}
+	// refined by quarter cells
+	vec2 base = bestM;
+	vec2 stepv = cs * 0.25;
+	for (int dy = -2; dy <= 2; dy++)
+		for (int dx = -2; dx <= 2; dx++)
+		{
+			if (dx == 0 && dy == 0)
+				continue;
+			vec2 m = base + vec2(dx, dy) * stepv;
+			float s = sad(c0, cs, m) + 0.001 * length(vec2(dx, dy));
+			if (s < best)
+			{
+				best = s;
+				bestM = m;
+			}
+		}
+	imageStore(outImage, cell, vec4(bestM, best, 0.0));
+}
+)";'''
+    fine_shader_new = r'''const char *const kFine = R"(
+void considerMotionCandidate(
+	vec2 motion, float score,
+	inout vec2 bestMotion, inout float bestScore,
+	inout float secondScore, inout bool hasSecond)
+{
+	// Repeated coarse neighbours must not inflate confidence as independent matches.
+	if (length(motion - bestMotion) < 0.00001)
+	{
+		bestScore = min(bestScore, score);
+		return;
+	}
+	if (score < bestScore)
+	{
+		secondScore = bestScore;
+		hasSecond = true;
+		bestScore = score;
+		bestMotion = motion;
+	}
+	else if (!hasSecond || score < secondScore)
+	{
+		secondScore = score;
+		hasSecond = true;
+	}
+}
+
+void main()
+{
+	ivec2 cell = ivec2(gl_GlobalInvocationID.xy);
+	if (cell.x >= 160 || cell.y >= 90)
+		return;
+	vec2 cs = 1.0 / vec2(160.0, 90.0);
+	vec2 c0 = (vec2(cell) + 0.5) * cs;
+	loadCur(c0, cs);
+
+	// Local texture variance helps identify ambiguous motion in flat areas.
+	float sum = 0.0;
+	float sumSq = 0.0;
+	for (int k = 0; k < 64; ++k)
+	{
+		sum += cur[k];
+		sumSq += cur[k] * cur[k];
+	}
+	float mean = sum / 64.0;
+	float variance = max(sumSq / 64.0 - mean * mean, 0.0);
+
+	ivec2 cc = cell / 2;
+	float best = sad(c0, cs, vec2(0.0));
+	float second = 1e9;
+	bool hasSecond = false;
+	vec2 bestM = vec2(0.0);
+
+	// Keep a distinct runner-up while searching the coarse neighbourhood.
+	for (int b = -1; b <= 1; b++)
+		for (int a = -1; a <= 1; a++)
+		{
+			ivec2 n = clamp(cc + ivec2(a, b), ivec2(0), ivec2(79, 44));
+			vec2 m = texelFetch(coarseTex, n, 0).xy;
+			float score = sad(c0, cs, m) + 0.002;
+			considerMotionCandidate(m, score, bestM, best, second, hasSecond);
+		}
+
+	vec2 base = bestM;
+	vec2 stepv = cs * 0.25;
+	for (int dy = -2; dy <= 2; dy++)
+		for (int dx = -2; dx <= 2; dx++)
+		{
+			if (dx == 0 && dy == 0)
+				continue;
+			vec2 m = base + vec2(dx, dy) * stepv;
+			float score = sad(c0, cs, m) + 0.001 * length(vec2(dx, dy));
+			considerMotionCandidate(m, score, bestM, best, second, hasSecond);
+		}
+
+	float matchQuality = 1.0 - smoothstep(0.025, 0.12, best);
+	float uniqueness = hasSecond
+		? smoothstep(0.003, 0.03, max(second - best, 0.0))
+		: 0.0;
+	float textureConfidence = smoothstep(0.001, 0.015, variance);
+	float motionPixels = length(bestM * vec2(textureSize(curTex, 0)));
+	float textureGate = mix(0.35 + 0.65 * textureConfidence,
+		1.0, smoothstep(0.5, 2.0, motionPixels));
+	float confidence = clamp(
+		matchQuality * (0.65 + 0.35 * uniqueness) * textureGate,
+		0.0, 1.0);
+
+	// xy = motion vector, z = match residual, w = confidence (0..1).
+	imageStore(outImage, cell, vec4(bestM, best, confidence));
+}
+)";'''
+
     # Validate every source-edit anchor before copying files or changing the build tree.
     preflight_anchors = (
         (cmake, 'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'),
         (cmake, '            frame_gen.cpp\n'),
         (context_cpp, '#include "frame_gen.h"\n'),
+        (context_cpp, 'imageViews.resize(swapChainImages.size());\n\t\tcommandPools.reserve(swapChainImages.size());'),
+        (context_cpp, 'device->waitIdle();\n\n\t\tif (!drawFences.empty())'),
+        (context_cpp, 'if (graphicsQueueIndex == presentQueueIndex)\n'),
+        (context_cpp, 'void VulkanContext::NewFrame()\n{'),
+        (context_cpp, 'commandBuffer.endRenderPass();\n\tcommandBuffer.end();'),
+        (context_cpp, 'device->resetFences(*drawFences[currentImage]);\n\tgraphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);'),
+        (context_h, '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);'),
+        (context_h, '\tbool renderDone = false;'),
+        (context_h, '\tstd::vector<vk::UniqueFence> drawFences;'),
+        (context_cpp, 'device->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);'),
+        (context_cpp, 'commandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));\n\tassert(!rendering);'),
+        (context_cpp, 'commandBuffer.endRenderPass();\n\tcommandBuffer.end();'),
+        (context_cpp, 'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);'),
+        (context_h, '\tbool renderDone = false;'),
+        (context_h, '\tstd::vector<vk::UniqueFence> drawFences;'),
+        (context_cpp, '\tswapChain.reset();\n\timageViews.clear();'),
         (context_cpp, 'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{'),
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
+        (context_cpp, 'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\n{\n\tif (!IsValid())\n\t\treturn;'),
+        (context_cpp, '\trenderDone = true;\n}\n\nvoid VulkanContext::Present() noexcept'),
+        (context_h, '\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'),
+        (context_cpp, 'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\n\t\t\tEndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
+        (context_cpp, 'EndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
+        (context_cpp, '} catch (const InvalidVulkanContext&) {\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}'),
         (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
         (context_h, '#include "vulkan.h"\n'),
         (context_h, '\tbool fgRealPending = false;\n'),
         (frame_gen_cpp, old_fragment),
+        (frame_gen_cpp, fine_shader_old),
         (shaders_cpp, quad_fragment_original),
         (shaders_cpp, 'vk::UniqueShaderModule ShaderManager::compileQuadFragmentShader(bool ignoreTexAlpha)\n'),
         (shaders_h, 'vk::ShaderModule GetQuadFragmentShader(bool ignoreTexAlpha)\n'),
@@ -166,6 +331,10 @@ def main() -> None:
         module / "src/frame_generation_policy.cpp",
         module / "src/frame_generation_controller.cpp",
         module / "src/frame_generation_bridge.cpp",
+        module / "src/resonance_frame_adapter.cpp",
+        module / "src/render_budget_controller.cpp",
+        module / "src/gpu_timestamp_math.cpp",
+        module / "include/whats_next/gpu_timestamp_math.hpp",
         module / "shaders/edge_aware_sharpen.comp",
         module / "shaders/mini_dlss_upscale.comp",
     )
@@ -178,7 +347,8 @@ def main() -> None:
     shutil.copytree(module / "include", target / "include", dirs_exist_ok=True)
     (target / "src").mkdir(parents=True, exist_ok=True)
     for name in ("history_gate.cpp", "frame_generation_policy.cpp",
-                 "frame_generation_controller.cpp", "frame_generation_bridge.cpp"):
+                 "frame_generation_controller.cpp", "frame_generation_bridge.cpp",
+                 "resonance_frame_adapter.cpp", "render_budget_controller.cpp", "gpu_timestamp_math.cpp"):
         shutil.copy2(module / "src" / name, target / "src" / name)
     shader_target = target / "shaders"
     shader_target.mkdir(parents=True, exist_ok=True)
@@ -199,11 +369,56 @@ def main() -> None:
         '            whats_next/src/frame_generation_policy.cpp\n'
         '            whats_next/src/frame_generation_controller.cpp\n'
         '            whats_next/src/frame_generation_bridge.cpp\n'
+        '            whats_next/src/resonance_frame_adapter.cpp\n'
+        '            whats_next/src/render_budget_controller.cpp\n'
+        '            whats_next/src/gpu_timestamp_math.cpp\n'
     )
     replace_once(
         context_cpp,
         '#include "frame_gen.h"\n',
-        '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n'
+        '#include <utility>\n#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/gpu_timestamp_math.hpp"\n#include "whats_next/render_budget_controller.hpp"\n'
+    )
+    replace_once(
+        context_cpp,
+        'if (graphicsQueueIndex == presentQueueIndex)\n',
+        'gpuTimestampValidBits = queueFamilyProperties[graphicsQueueIndex].timestampValidBits;\n'
+        '\tgpuTimestampPeriodNs = physicalDeviceProperties.limits.timestampPeriod;\n'
+        '\tgpuTimestampSupported = physicalDeviceProperties.limits.timestampComputeAndGraphics &&\n'
+        '\t\tgpuTimestampValidBits > 0 && gpuTimestampPeriodNs > 0.0 && gpuTimestampPeriodNs < 1.0e9;\n'
+        '\twhatsNextRenderBudget.reset(whats_next::RenderQuality::Quality);\n'
+        '\tNOTICE_LOG(RENDERER, "GPU timestamps %s (valid bits %u, period %.3f ns)",\n'
+        '\t\tgpuTimestampSupported ? "available" : "unavailable", gpuTimestampValidBits, gpuTimestampPeriodNs);\n'
+        '\tif (graphicsQueueIndex == presentQueueIndex)\n'
+    )
+    replace_once(
+        context_cpp,
+        'device->waitIdle();\n\n\t\tif (!drawFences.empty())',
+        'device->waitIdle();\n'
+        '\t\tgpuTimestampPools.clear();\n'
+        '\t\tgpuTimestampPending.clear();\n'
+        '\t\tgpuTimestampRecording = false;\n'
+        '\t\tlastGpuFrameTimeValid = false;\n'
+        '\n\t\tif (!drawFences.empty())'
+    )
+    replace_once(
+        context_cpp,
+        'imageViews.resize(swapChainImages.size());\n\t\tcommandPools.reserve(swapChainImages.size());',
+        'imageViews.resize(swapChainImages.size());\n'
+        '\t\tif (gpuTimestampSupported) {\n'
+        '\t\t\ttry {\n'
+        '\t\t\t\tgpuTimestampPools.reserve(swapChainImages.size());\n'
+        '\t\t\t\tgpuTimestampPending.assign(swapChainImages.size(), 0);\n'
+        '\t\t\t\tfor (size_t i = 0; i < swapChainImages.size(); ++i)\n'
+        '\t\t\t\t\tgpuTimestampPools.push_back(device->createQueryPoolUnique(\n'
+        '\t\t\t\t\t\tvk::QueryPoolCreateInfo(vk::QueryPoolCreateFlags(), vk::QueryType::eTimestamp, 2)));\n'
+        '\t\t\t} catch (const vk::SystemError& err) {\n'
+        '\t\t\t\tWARN_LOG(RENDERER, "GPU timestamp query pools unavailable: %s", err.what());\n'
+        '\t\t\t\tgpuTimestampPools.clear();\n'
+        '\t\t\t\tgpuTimestampPending.clear();\n'
+        '\t\t\t\tgpuTimestampSupported = false;\n'
+        '\t\t\t}\n'
+        '\t\t}\n'
+        '\t\tcommandPools.reserve(swapChainImages.size());'
     )
     replace_once(
         context_cpp,
@@ -211,11 +426,14 @@ def main() -> None:
         'void VulkanContext::CreateSwapChain()\n{\n#ifdef __ORBIS__\n'
         '\t++fgResourceGeneration;\n'
         '\twhatsNextBridge.reset();\n'
+        '\twhatsNextRenderBudget.reset(whatsNextRenderBudget.quality());\n'
         '\tfgPrevView = vk::ImageView();\n'
         '\tfgPrevExtent = vk::Extent2D();\n'
         '\tfgStreak = 0;\n'
         '#endif\n\ttry\n\t{'
     )
+
+    replace_once(frame_gen_cpp, fine_shader_old, fine_shader_new)
 
     # The existing frame-generation fragment shader is the only safe insertion point
     # without introducing another offscreen target or a CPU readback.
@@ -225,9 +443,17 @@ def main() -> None:
 	vec2 m = mo.xy;
 	vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
 	vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
-	// A poor match (something appearing, a cut): use the newer frame.
-	float w = smoothstep(0.03, 0.10, mo.z);
-	vec3 base = mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb;
+	vec3 realFrame = textureLod(curTex, uv, 0.0).rgb;
+
+	// Confidence-aware rejection: ambiguous motion and warped-sample disagreement
+	// are treated as possible occlusion/disocclusion, not as valid interpolation.
+	float residualReject = smoothstep(0.035, 0.10, mo.z);
+	float confidenceReject = 1.0 - clamp(mo.w, 0.0, 1.0);
+	float warpedLumaA = dot(a.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float warpedLumaB = dot(b.rgb, vec3(0.2126, 0.7152, 0.0722));
+	float disocclusionReject = smoothstep(0.08, 0.20, abs(warpedLumaA - warpedLumaB));
+	float reject = max(residualReject, max(confidenceReject, disocclusionReject));
+	vec3 base = mix(mix(a.rgb, b.rgb, 0.5), realFrame, reject);
 
 	// Mini-DLSS spatial finishing pass: 10% stronger edge-aware sharpening.
 	vec2 texel = 1.0 / vec2(textureSize(curTex, 0));
@@ -260,8 +486,14 @@ void main()
     vec2 m = mo.xy;
     vec4 a = textureLod(prevTex, uv - m * 0.5, 0.0);
     vec4 b = textureLod(curTex, uv + m * 0.5, 0.0);
-    float w = smoothstep(0.03, 0.10, mo.z);
-    color = vec4(mix(mix(a, b, 0.5), textureLod(curTex, uv, 0.0), w).rgb, 1.0);
+    vec3 realFrame = textureLod(curTex, uv, 0.0).rgb;
+    float residualReject = smoothstep(0.035, 0.10, mo.z);
+    float confidenceReject = 1.0 - clamp(mo.w, 0.0, 1.0);
+    float lumaA = dot(a.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float lumaB = dot(b.rgb, vec3(0.2126, 0.7152, 0.0722));
+    float disocclusionReject = smoothstep(0.08, 0.20, abs(lumaA - lumaB));
+    float reject = max(residualReject, max(confidenceReject, disocclusionReject));
+    color = vec4(mix(mix(a.rgb, b.rgb, 0.5), realFrame, reject), 1.0);
 }
 )";'''
     replace_once(frame_gen_cpp, ')";\n} // namespace', ')";\n' + mini_shader_constant + '\n} // namespace')
@@ -283,7 +515,7 @@ void main()
     replace_once(
         context_h,
         '#include "vulkan.h"\n',
-        '#include "vulkan.h"\n#include "whats_next/frame_generation_bridge.hpp"\n'
+        '#include "vulkan.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/render_budget_controller.hpp"\n'
     )
 
     replace_once(
@@ -292,25 +524,151 @@ void main()
         '#ifdef __ORBIS__\n\t// a new frame from the renderer'
     )
 
+    replace_once(
+        context_cpp,
+        'void VulkanContext::NewFrame()\n{',
+        'void VulkanContext::NewFrame()\n{\n'
+        '\tlastGpuFrameTimeValid = false;\n'
+        '\tgpuTimestampRecording = false;'
+    )
+    replace_once(
+        context_cpp,
+        '\tdevice->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);',
+        '\tif (gpuTimestampSupported && currentImage < gpuTimestampPools.size() &&\n'
+        '\t\t\tcurrentImage < gpuTimestampPending.size() && gpuTimestampPending[currentImage]) {\n'
+        '\t\tuint64_t timestamps[2] = {};\n'
+        '\t\tvk::Result queryResult = vk::Result::eErrorUnknown;\n'
+        '\t\ttry {\n'
+        '\t\t\tqueryResult = device->getQueryPoolResults(\n'
+        '\t\t\t\t\t*gpuTimestampPools[currentImage], 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t),\n'
+        '\t\t\t\t\tvk::QueryResultFlagBits::e64);\n'
+        '\t\t} catch (const vk::SystemError& err) {\n'
+        '\t\t\tWARN_LOG(RENDERER, "GPU timestamp result unavailable: %s", err.what());\n'
+        '\t\t\tgpuTimestampSupported = false;\n'
+        '\t\t}\n'
+        '\t\tgpuTimestampPending[currentImage] = 0;\n'
+        '\t\tdouble frameMs = 0.0;\n'
+        '\t\tif (queryResult == vk::Result::eSuccess && whats_next::gpu_timestamp_delta_ms(\n'
+        '\t\t\t\ttimestamps[0], timestamps[1], gpuTimestampValidBits, gpuTimestampPeriodNs, frameMs)) {\n'
+        '\t\t\tlastGpuFrameTimeMs = frameMs;\n'
+        '\t\t\tlastGpuFrameTimeValid = true;\n'
+        '\t\t\tconst auto previousQuality = whatsNextRenderBudget.quality();\n'
+        '\t\t\tconst double frameBudgetMs = (config::Broadcast == 1 || config::Broadcast == 3)\n'
+        '\t\t\t\t\t? 20.0 : (1000.0 / 59.94);\n'
+        '\t\t\tconst auto currentQuality = whatsNextRenderBudget.update(frameMs, frameBudgetMs, true);\n'
+        '\t\t\tif (currentQuality != previousQuality) {\n'
+        '\t\t\t\tconst char* qualityName = currentQuality == whats_next::RenderQuality::Eco ? "eco" :\n'
+        '\t\t\t\t\t\t(currentQuality == whats_next::RenderQuality::Balanced ? "balanced" : "quality");\n'
+        '\t\t\t\tNOTICE_LOG(RENDERER, "Adaptive GPU quality: %s (GPU %.2f ms / %.2f ms budget)",\n'
+        '\t\t\t\t\t\tqualityName, frameMs, frameBudgetMs);\n'
+        '\t\t\t}\n'
+        '\t\t}\n'
+        '\t}\n'
+        '\tdevice->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);'
+    )
+    replace_once(
+        context_cpp,
+        'commandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));\n\tassert(!rendering);',
+        'commandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));\n'
+        '\tif (gpuTimestampSupported && currentImage < gpuTimestampPools.size()) {\n'
+        '\t\tcommandBuffer.resetQueryPool(*gpuTimestampPools[currentImage], 0, 2);\n'
+        '\t\tcommandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, *gpuTimestampPools[currentImage], 0);\n'
+        '\t\tgpuTimestampRecording = true;\n'
+        '\t}\n'
+        '\tassert(!rendering);'
+    )
     bridge_gate = '''&& fgPrevExtent == extent;
-\t\tconst bool eligible = interpolate;
-\t\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
-\t\t{
-\t\t\t++fgResourceGeneration;
-\t\t\twhatsNextBridge.reset();
-\t\t}
-\t\tconst auto decision = whatsNextBridge.begin_real_frame(
-\t\t\t\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
-\t\t\t\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
-\t\t\t\t\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
-\t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
-\t\twhatsNextBridge.commit_real_frame(); // commit each real source frame after the renderer accepts its image'''
+		const bool eligible = interpolate && whats_next::RenderBudgetController::profile(whatsNextRenderBudget.quality()).temporal_effects_allowed;
+		if ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
+		{
+			++fgResourceGeneration;
+			whatsNextBridge.reset();
+		}
+		const auto decision = whatsNextBridge.begin_real_frame(
+				eligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
+				fgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
+					(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
+		interpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
+'''
     replace_once(context_cpp, 'fgPrevExtent == extent;', 'fgPrevExtent == extent;\n' + '\n'.join(bridge_gate.splitlines()[1:]))
+    # The frame bridge commits only after EndFrame has submitted successfully.
+    replace_once(
+        context_cpp,
+        'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\n{\n\tif (!IsValid())\n\t\treturn;',
+        'bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\n{\n\tif (!IsValid()) {\n'
+        '\t\tgpuTimestampRecording = false;\n\t\treturn false;\n\t}'
+    )
+    replace_once(
+        context_cpp,
+        'commandBuffer.endRenderPass();\n\tcommandBuffer.end();',
+        'commandBuffer.endRenderPass();\n'
+        '\tif (gpuTimestampRecording && currentImage < gpuTimestampPools.size())\n'
+        '\t\tcommandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, *gpuTimestampPools[currentImage], 1);\n'
+        '\tcommandBuffer.end();'
+    )
+    replace_once(
+        context_cpp,
+        'device->resetFences(*drawFences[currentImage]);\n\tgraphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);',
+        'try {\n'
+        '\t\t// Keep the waited, signaled fence intact until queue submission succeeds.\n'
+        '\t\tauto submittedFence = device->createFenceUnique(vk::FenceCreateInfo());\n'
+        '\t\tgraphicsQueue.submit(submitInfo, *submittedFence);\n'
+        '\t\tdrawFences[currentImage] = std::move(submittedFence);\n'
+        '\t} catch (const vk::SystemError& err) {\n'
+        '\t\tWARN_LOG(RENDERER, "Vulkan frame submission failed: %s", err.what());\n'
+        '\t\tgpuTimestampRecording = false;\n'
+        '\t\tif (currentImage < gpuTimestampPending.size()) gpuTimestampPending[currentImage] = 0;\n'
+        '\t\t// The original fence remains signaled; the unsubmitted temporary fence is discarded.\n'
+        '\t\tthrow InvalidVulkanContext();\n'
+        '\t}\n'
+        '\tif (gpuTimestampRecording && currentImage < gpuTimestampPending.size())\n'
+        '\t\tgpuTimestampPending[currentImage] = 1;\n'
+        '\tgpuTimestampRecording = false;\n'
+        '\tassert(rendering);'
+    )
+    replace_once(
+        context_cpp,
+        '\trenderDone = true;\n}\n\nvoid VulkanContext::Present() noexcept',
+        '\trenderDone = true;\n\treturn true;\n}\n\nvoid VulkanContext::Present() noexcept'
+    )
+    replace_once(
+        context_h,
+        '\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());',
+        '\tbool EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'
+    )
+    replace_once(
+        context_cpp,
+        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\n\t\t\tEndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();',
+        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\n'
+        '\t\t\tif (EndFrame(overlayCmdBuffer))\n'
+        '\t\t\t\twhatsNextBridge.commit_real_frame();\n'
+        '\t\t\telse\n'
+        '\t\t\t\twhatsNextBridge.abort_real_frame();\n'
+        '\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'
+    )
+    replace_once(
+        context_cpp,
+        '} catch (const InvalidVulkanContext&) {\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}',
+        '} catch (const InvalidVulkanContext&) {\n'
+        '\t\t\twhatsNextBridge.abort_real_frame();\n'
+        '\t\t\tgpuTimestampRecording = false;\n'
+        '\t\t\t// Re-create swap chain\n'
+        '\t\t\tresized = true;\n'
+        '\t\t}'
+    )
 
     replace_once(
         context_cpp,
         '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();',
         '\tif (gui_is_open())\n\t{\n\t\tif (!fgWasGuiOpen)\n\t\t{\n\t\t\t++fgGameSession;\n\t\t\twhatsNextBridge.reset();\n\t\t}\n\t\tfgPrevView = vk::ImageView();\n\t}\n\tfgWasGuiOpen = gui_is_open();'
+    )
+    replace_once(
+        context_cpp,
+        '\tswapChain.reset();\n\timageViews.clear();',
+        '\tgpuTimestampPools.clear();\n'
+        '\tgpuTimestampPending.clear();\n'
+        '\tgpuTimestampRecording = false;\n'
+        '\tswapChain.reset();\n\timageViews.clear();'
     )
     replace_once(
         context_h,
@@ -404,6 +762,8 @@ void main()
         context_cpp,
         '\tif (config::Rotate90)\n\t\tquadRotatePipeline->BindPipeline(commandBuffer);\n\telse\n\t\tquadPipeline->BindPipeline(commandBuffer);\n',
         '#ifdef __ORBIS__\n'
+        '\tconst auto miniDlssProfile = whats_next::RenderBudgetController::profile(whatsNextRenderBudget.quality());\n'
+        '\tconst float miniDlssPushConstants[4] = { miniDlssProfile.edge_threshold, 1.0f, 1.0f, miniDlssProfile.sharpening_strength };\n'
         '\tconst bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode\n'
         '\t\t\t&& !gui_is_open() && !(fgDraw && frameGen != nullptr);\n'
         '\tif (miniDlssActive && config::Rotate90)\n'
@@ -423,9 +783,9 @@ void main()
         '\tif (fgDraw && frameGen != nullptr)\n\t\tframeGen->Draw(commandBuffer, *renderPass);\n'
         '#ifdef __ORBIS__\n'
         '\telse if (miniDlssActive && config::Rotate90)\n'
-        '\t\tquadRotateMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '\t\tquadRotateMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation, miniDlssPushConstants);\n'
         '\telse if (miniDlssActive)\n'
-        '\t\tquadMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
+        '\t\tquadMiniDlssDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation, miniDlssPushConstants);\n'
         '#endif\n'
         '\telse if (config::Rotate90)\n'
         '\t\tquadRotateDrawer->Draw(commandBuffer, imageView, vtx, !config::LinearInterpolation);\n'
@@ -440,6 +800,36 @@ void main()
         '\tquadMiniDlssPipeline.reset();\n\tquadRotateMiniDlssPipeline.reset();\n'
         '#endif\n'
         '\tquadDrawer.reset();\n'
+    )
+    replace_once(
+        context_h,
+        '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);',
+        '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);\n'
+        '\tbool GetLastGpuFrameTimeMs(double& milliseconds) const {\n'
+        '\t\tif (!lastGpuFrameTimeValid) return false;\n'
+        '\t\tmilliseconds = lastGpuFrameTimeMs;\n'
+        '\t\treturn true;\n'
+        '\t}\n'
+        '\tbool SupportsGpuTimestamps() const { return gpuTimestampSupported; }'
+    )
+    replace_once(
+        context_h,
+        '\tbool renderDone = false;',
+        '\tbool renderDone = false;\n'
+        '\twhats_next::RenderBudgetController whatsNextRenderBudget;\n'
+        '\tbool gpuTimestampSupported = false;\n'
+        '\tbool gpuTimestampRecording = false;\n'
+        '\tbool lastGpuFrameTimeValid = false;\n'
+        '\tu32 gpuTimestampValidBits = 0;\n'
+        '\tdouble gpuTimestampPeriodNs = 0.0;\n'
+        '\tdouble lastGpuFrameTimeMs = 0.0;'
+    )
+    replace_once(
+        context_h,
+        '\tstd::vector<vk::UniqueFence> drawFences;',
+        '\tstd::vector<vk::UniqueFence> drawFences;\n'
+        '\tstd::vector<vk::UniqueQueryPool> gpuTimestampPools;\n'
+        '\tstd::vector<u8> gpuTimestampPending;'
     )
     replace_once(
         context_h,
@@ -459,15 +849,15 @@ void main()
     )
 
     # Independent switches: WHAT'S NEXT controls generated frames; Mini-DLSS controls
-    # spatial sharpening on ordinary and generated frames. Default internal resolution is
-    # raised by 10% (480p -> 528p); the matching menu choice is added below.
+    # spatial sharpening on ordinary and generated frames. Keep the default internal
+    # resolution at the upstream 480p baseline to avoid silently increasing GPU load.
     replace_once(option_cpp,
         'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n',
         'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n'
-        'Option<bool> MiniDLSS("rend.MiniDLSS", true);\n')
+        'Option<bool> MiniDLSS("rend.MiniDLSS", false);\n')
     replace_once(option_cpp,
         'Option<int> RenderResolution("rend.Resolution", 480);',
-        'Option<int> RenderResolution("rend.Resolution", 720);')
+        'Option<int> RenderResolution("rend.Resolution", 480);')
     replace_once(option_h,
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\n',
         'extern Option<bool> FrameGeneration;\t// Resonance: in-between pictures for 30 fps games\nextern Option<bool> MiniDLSS;\n')
@@ -488,36 +878,122 @@ void main()
         'const float scales[] = { 1.f, 1.1f, 1.5f, 2.f, 3.f, 4.f };')
     replace_once(context_cpp,
         'const bool miniDlssActive = config::FrameGeneration && !settings.input.fastForwardMode',
-        'const bool miniDlssActive = config::MiniDLSS && !settings.input.fastForwardMode')
-    # Use a stronger but locally bounded spatial finish and a 1.5x internal-resolution default.
+        'const bool miniDlssActive = config::MiniDLSS && miniDlssProfile.sharpening_strength > 0.0f && !settings.input.fastForwardMode')
+    # The ordinary-frame Mini-DLSS shader now receives its strength and edge threshold
+    # from the live render-budget profile through the existing push constants. Keep
+    # this dynamic mapping instead of overwriting it with a fixed sharpening constant.
     shaders_cpp_text = shaders_cpp.read_text(encoding="utf-8")
-    strength_anchors = ("0.12 * edgeGate", "0.132 * edgeGate", "0.28 * edgeGate")
-    strength_matches = [anchor for anchor in strength_anchors if shaders_cpp_text.count(anchor) == 1]
-    if len(strength_matches) != 1:
-        raise SystemExit("Expected exactly one ordinary-frame Mini-DLSS strength constant; found: " + ", ".join(strength_matches))
-    shaders_cpp_text = shaders_cpp_text.replace(strength_matches[0], "0.28 * edgeGate", 1)
-    shaders_cpp.write_text(shaders_cpp_text, encoding="utf-8")
+    for marker in ("pushConstants.color.r * 0.35", "pushConstants.color.a, 0.0, 0.25"):
+        if marker not in shaders_cpp_text:
+            raise SystemExit("Adaptive Mini-DLSS shader profile input is missing: " + marker)
 
     # Fail closed if the bridge was copied but its lifecycle hooks did not land.
     integrated_cmake = cmake.read_text(encoding="utf-8")
     if "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include" not in integrated_cmake or (chr(92) + "${CMAKE_CURRENT_SOURCE_DIR}/whats_next/include") in integrated_cmake:
         raise SystemExit("Mini-DLSS CMake include path is malformed.")
 
+    symbol_wrapper_text = vk_symbol_wrapper_c.read_text(encoding="utf-8")
+    symbol_header_text = vk_symbol_wrapper_h.read_text(encoding="utf-8")
+    for symbol in ("vkCreateQueryPool", "vkDestroyQueryPool", "vkGetQueryPoolResults", "vkCmdResetQueryPool", "vkCmdWriteTimestamp"):
+        if symbol not in symbol_wrapper_text or symbol not in symbol_header_text:
+            raise SystemExit("The pinned Vulkan symbol wrapper does not expose GPU timestamp function: " + symbol)
     integrated_context = context_cpp.read_text(encoding="utf-8")
     required_hooks = (
         "whatsNextBridge.begin_real_frame",
         "whatsNextBridge.commit_real_frame",
+        "whatsNextBridge.abort_real_frame",
         "whatsNextBridge.reset()",
     )
     missing_hooks = [hook for hook in required_hooks if hook not in integrated_context]
     if missing_hooks:
         raise SystemExit("Renderer integration incomplete; missing hooks: " + ", ".join(missing_hooks))
-    if "Mini-DLSS spatial finishing pass" not in frame_gen_cpp.read_text(encoding="utf-8"):
+    integrated_frame_gen = frame_gen_cpp.read_text(encoding="utf-8")
+    if "Mini-DLSS spatial finishing pass" not in integrated_frame_gen:
         raise SystemExit("Mini-DLSS spatial finishing pass was not installed.")
+    for marker in ("considerMotionCandidate", "textureConfidence", "disocclusionReject", "mo.w"):
+        if marker not in integrated_frame_gen:
+            raise SystemExit("ANR-inspired confidence-aware frame generation is incomplete: " + marker)
+    expected_submission_branch = ("if (EndFrame(overlayCmdBuffer))\n"
+        "\t\t\t\twhatsNextBridge.commit_real_frame();\n"
+        "\t\t\telse\n"
+        "\t\t\t\twhatsNextBridge.abort_real_frame();")
+    if expected_submission_branch not in integrated_context:
+        raise SystemExit("Source-frame history is not committed/aborted from the explicit EndFrame submission result.")
+    if "bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)" not in integrated_context or "return false;" not in integrated_context or "return true;" not in integrated_context:
+        raise SystemExit("EndFrame does not expose an explicit submission-success result.")
+    if "bool EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());" not in context_h.read_text(encoding="utf-8"):
+        raise SystemExit("EndFrame declaration does not match its boolean submission result.")
+    if "whatsNextBridge.abort_real_frame();" not in integrated_context:
+        raise SystemExit("Renderer abort path does not close the pending source-frame transaction.")
+    if "gpu_timestamp_math.cpp" not in integrated_cmake:
+        raise SystemExit("GPU timestamp conversion helper is missing from the renderer build.")
+    for marker in ("gpuTimestampPools", "vk::PipelineStageFlagBits::eTopOfPipe", "vk::PipelineStageFlagBits::eBottomOfPipe", "gpuTimestampPending[currentImage] = 1;", "whatsNextRenderBudget.update", "temporal_effects_allowed", "miniDlssProfile.sharpening_strength", "miniDlssProfile.sharpening_strength > 0.0f", "miniDlssPushConstants"):
+        if marker not in integrated_context:
+            raise SystemExit("Vulkan GPU timestamp lifecycle is incomplete: " + marker)
+    # Enforce the timestamp lifecycle order in the generated renderer, not merely
+    # the presence of API names. Results must be consumed before re-recording,
+    # both stage markers must bracket the frame, and pending state is published
+    # only after queue submission has been accepted.
+    timestamp_order = (
+        "device->getQueryPoolResults(",
+        "commandBuffer.resetQueryPool(",
+        "commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe",
+        "commandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe",
+        "graphicsQueue.submit(submitInfo, *submittedFence);",
+        "gpuTimestampPending[currentImage] = 1;",
+    )
+    timestamp_positions = [integrated_context.find(marker) for marker in timestamp_order]
+    if any(position < 0 for position in timestamp_positions) or timestamp_positions != sorted(timestamp_positions):
+        raise SystemExit("GPU timestamp query lifecycle is out of order; refusing unsafe renderer integration.")
+
+    # Query results are consumed only after the fence for the reacquired image.
+    # The old swapchain's pools are destroyed only after device.waitIdle().
+    fence_wait = integrated_context.find("device->waitForFences(*drawFences[currentImage]")
+    result_read = integrated_context.find("device->getQueryPoolResults(")
+    idle_wait = integrated_context.find("device->waitIdle();")
+    pool_destroy = integrated_context.find("gpuTimestampPools.clear();")
+    pool_create = integrated_context.find("device->createQueryPoolUnique(")
+    if min(fence_wait, result_read, idle_wait, pool_destroy, pool_create) < 0:
+        raise SystemExit("GPU timestamp fence/pool lifecycle is incomplete.")
+    if fence_wait > result_read:
+        raise SystemExit("GPU timestamp results may be read before the reacquired image fence.")
+    if idle_wait > pool_destroy or pool_destroy > pool_create:
+        raise SystemExit("GPU timestamp query pools may be destroyed before idle or recreated before cleanup.")
+
+    # Preserve the old signaled fence until submission is accepted. A temporary
+    # unsignaled fence is moved into the image slot only after vkQueueSubmit succeeds.
+    submit_try = integrated_context.find("auto submittedFence = device->createFenceUnique(vk::FenceCreateInfo());")
+    submit_call = integrated_context.find("graphicsQueue.submit(submitInfo, *submittedFence);")
+    fence_publish = integrated_context.find("drawFences[currentImage] = std::move(submittedFence);")
+    submit_catch = integrated_context.find("Vulkan frame submission failed:")
+    reset_fence = integrated_context.find("device->resetFences(*drawFences[currentImage]);")
+    if min(submit_try, submit_call, fence_publish, submit_catch) < 0:
+        raise SystemExit("Transactional frame-fence submission is incomplete; refusing renderer integration.")
+    if not (submit_try < submit_call < fence_publish < submit_catch):
+        raise SystemExit("Frame fence is published before successful queue submission.")
+    if reset_fence >= 0:
+        raise SystemExit("Renderer still resets the live image fence before queue submission.")
+    submit_pending = integrated_context.find("gpuTimestampPending[currentImage] = 1;", submit_call)
+    if submit_pending < submit_call:
+        raise SystemExit("GPU timestamp pending state is published before accepted queue submission.")
+
+    # Unsupported queues and failed query-pool creation must disable measurement
+    # without affecting rendering or changing the user's selected effects.
+    for marker in ("gpuTimestampValidBits > 0", "gpuTimestampPeriodNs > 0.0",
+                   "gpuTimestampSupported = false;", "gpuTimestampPending[currentImage] = 0;"):
+        if marker not in integrated_context:
+            raise SystemExit("GPU timestamp fail-closed handling is incomplete: " + marker)
+    if "GetLastGpuFrameTimeMs(double& milliseconds) const" not in context_h.read_text(encoding="utf-8"):
+        raise SystemExit("The Vulkan renderer does not expose completed GPU frame-time samples.")
     if "quadMiniDlssDrawer->Draw" not in integrated_context:
         raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
         raise SystemExit("Mini-DLSS quad shader variant was not installed.")
+    integrated_options = option_cpp.read_text(encoding="utf-8")
+    if 'Option<bool> FrameGeneration("rend.FrameGeneration", false);' not in integrated_options:
+        raise SystemExit("Frame generation must remain disabled by default until PS4 runtime validation passes.")
+    if 'Option<bool> MiniDLSS("rend.MiniDLSS", false);' not in integrated_options:
+        raise SystemExit("Mini-DLSS must remain opt-in until PS4 image-quality and performance validation passes.")
     integrated_menu = settings_menu_cpp.read_text(encoding="utf-8")
     for label in ("Генерация промежуточных кадров", "Мини-DLSS — повышение чёткости"):
         if label not in integrated_menu:
