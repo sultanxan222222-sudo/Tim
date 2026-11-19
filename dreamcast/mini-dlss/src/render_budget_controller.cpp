@@ -89,7 +89,7 @@ RenderQualityProfile RenderBudgetController::profile(RenderQuality quality) noex
         return {0.12f, 0.045f, true};
     case RenderQuality::Balanced:
     default:
-        return {0.12f, 0.075f, false};
+        return {0.08f, 0.075f, false};
     }
 }
 
