@@ -33,6 +33,8 @@ jobs:
         run: |
           test -f /tmp/flycast/core/rend/vulkan/whats_next/src/frame_generation_bridge.cpp
           grep -q 'whats_next/src/frame_generation_bridge.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
+          test -f /tmp/flycast/core/rend/vulkan/whats_next/src/resonance_frame_adapter.cpp
+          grep -q 'whats_next/src/resonance_frame_adapter.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
           grep -q 'whatsNextBridge.begin_real_frame' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
           grep -q 'Mini-DLSS spatial finishing pass' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
           grep -q 'considerMotionCandidate' /tmp/flycast/core/rend/vulkan/frame_gen.cpp
