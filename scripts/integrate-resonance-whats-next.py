@@ -426,6 +426,7 @@ void main()
         'void VulkanContext::CreateSwapChain()\n{\n#ifdef __ORBIS__\n'
         '\t++fgResourceGeneration;\n'
         '\twhatsNextBridge.reset();\n'
+        '\twhatsNextRenderBudget.reset(whatsNextRenderBudget.quality());\n'
         '\tfgPrevView = vk::ImageView();\n'
         '\tfgPrevExtent = vk::Extent2D();\n'
         '\tfgStreak = 0;\n'
