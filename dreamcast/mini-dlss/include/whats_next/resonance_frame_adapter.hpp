@@ -20,8 +20,11 @@ public:
         std::uint64_t game_session,
         std::uint32_t refresh_intervals) noexcept;
 
-    // Call after the renderer has accepted the source frame for presentation.
+    // Commit only after the source frame's command buffer was accepted for submission.
     void commit_source_frame() noexcept;
+
+    // Abandon a source frame whose recording/presentation failed before submission.
+    void abort_source_frame() noexcept;
 
     // Call on swapchain/image recreation, game/session change, or renderer teardown.
     void reset() noexcept;
