@@ -263,6 +263,12 @@ void main()
         (context_h, '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);'),
         (context_h, '\tbool renderDone = false;'),
         (context_h, '\tstd::vector<vk::UniqueFence> drawFences;'),
+        (context_cpp, 'device->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);'),
+        (context_cpp, 'commandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));\n\tassert(!rendering);'),
+        (context_cpp, 'commandBuffer.endRenderPass();\n\tcommandBuffer.end();'),
+        (context_cpp, 'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);'),
+        (context_h, '\tbool renderDone = false;'),
+        (context_h, '\tstd::vector<vk::UniqueFence> drawFences;'),
         (context_cpp, '\tswapChain.reset();\n\timageViews.clear();'),
         (context_cpp, 'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{'),
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
@@ -362,6 +368,47 @@ void main()
         context_cpp,
         '#include "frame_gen.h"\n',
         '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/gpu_timestamp_math.hpp"\n'
+    )
+    replace_once(
+        context_cpp,
+        'if (graphicsQueueIndex == presentQueueIndex)\n',
+        'gpuTimestampValidBits = queueFamilyProperties[graphicsQueueIndex].timestampValidBits;\n'
+        '\tgpuTimestampPeriodNs = physicalDeviceProperties.limits.timestampPeriod;\n'
+        '\tgpuTimestampSupported = physicalDeviceProperties.limits.timestampComputeAndGraphics &&\n'
+        '\t\tgpuTimestampValidBits > 0 && gpuTimestampPeriodNs > 0.0 && gpuTimestampPeriodNs < 1.0e9;\n'
+        '\tNOTICE_LOG(RENDERER, "GPU timestamps %s (valid bits %u, period %.3f ns)",\n'
+        '\t\tgpuTimestampSupported ? "available" : "unavailable", gpuTimestampValidBits, gpuTimestampPeriodNs);\n'
+        '\tif (graphicsQueueIndex == presentQueueIndex)\n'
+    )
+    replace_once(
+        context_cpp,
+        'device->waitIdle();\n\n\t\tif (!drawFences.empty())',
+        'device->waitIdle();\n'
+        '\t\tgpuTimestampPools.clear();\n'
+        '\t\tgpuTimestampPending.clear();\n'
+        '\t\tgpuTimestampRecording = false;\n'
+        '\t\tlastGpuFrameTimeValid = false;\n'
+        '\n\t\tif (!drawFences.empty())'
+    )
+    replace_once(
+        context_cpp,
+        'imageViews.resize(swapChainImages.size());\n\t\tcommandPools.reserve(swapChainImages.size());',
+        'imageViews.resize(swapChainImages.size());\n'
+        '\t\tif (gpuTimestampSupported) {\n'
+        '\t\t\ttry {\n'
+        '\t\t\t\tgpuTimestampPools.reserve(swapChainImages.size());\n'
+        '\t\t\t\tgpuTimestampPending.assign(swapChainImages.size(), 0);\n'
+        '\t\t\t\tfor (size_t i = 0; i < swapChainImages.size(); ++i)\n'
+        '\t\t\t\t\tgpuTimestampPools.push_back(device->createQueryPoolUnique(\n'
+        '\t\t\t\t\t\tvk::QueryPoolCreateInfo(vk::QueryPoolCreateFlags(), vk::QueryType::eTimestamp, 2)));\n'
+        '\t\t\t} catch (const vk::SystemError& err) {\n'
+        '\t\t\t\tWARN_LOG(RENDERER, "GPU timestamp query pools unavailable: %s", err.what());\n'
+        '\t\t\t\tgpuTimestampPools.clear();\n'
+        '\t\t\t\tgpuTimestampPending.clear();\n'
+        '\t\t\t\tgpuTimestampSupported = false;\n'
+        '\t\t\t}\n'
+        '\t\t}\n'
+        '\t\tcommandPools.reserve(swapChainImages.size());'
     )
     replace_once(
         context_cpp,
@@ -466,6 +513,43 @@ void main()
         '#ifdef __ORBIS__\n\t// a new frame from the renderer'
     )
 
+    replace_once(
+        context_cpp,
+        'void VulkanContext::NewFrame()\n{',
+        'void VulkanContext::NewFrame()\n{\n'
+        '\tlastGpuFrameTimeValid = false;\n'
+        '\tgpuTimestampRecording = false;'
+    )
+    replace_once(
+        context_cpp,
+        '\tdevice->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);',
+        '\tif (gpuTimestampSupported && currentImage < gpuTimestampPools.size() &&\n'
+        '\t\t\tcurrentImage < gpuTimestampPending.size() && gpuTimestampPending[currentImage]) {\n'
+        '\t\tuint64_t timestamps[2] = {};\n'
+        '\t\tconst vk::Result queryResult = device->getQueryPoolResults(\n'
+        '\t\t\t\t*gpuTimestampPools[currentImage], 0, 2, sizeof(timestamps), timestamps, sizeof(uint64_t),\n'
+        '\t\t\t\tvk::QueryResultFlagBits::e64);\n'
+        '\t\tgpuTimestampPending[currentImage] = 0;\n'
+        '\t\tdouble frameMs = 0.0;\n'
+        '\t\tif (queryResult == vk::Result::eSuccess && whats_next::gpu_timestamp_delta_ms(\n'
+        '\t\t\t\ttimestamps[0], timestamps[1], gpuTimestampValidBits, gpuTimestampPeriodNs, frameMs)) {\n'
+        '\t\t\tlastGpuFrameTimeMs = frameMs;\n'
+        '\t\t\tlastGpuFrameTimeValid = true;\n'
+        '\t\t}\n'
+        '\t}\n'
+        '\tdevice->resetCommandPool(*commandPools[currentImage], vk::CommandPoolResetFlagBits::eReleaseResources);'
+    )
+    replace_once(
+        context_cpp,
+        'commandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));\n\tassert(!rendering);',
+        'commandBuffer.begin(vk::CommandBufferBeginInfo(vk::CommandBufferUsageFlagBits::eOneTimeSubmit));\n'
+        '\tif (gpuTimestampSupported && currentImage < gpuTimestampPools.size()) {\n'
+        '\t\tcommandBuffer.resetQueryPool(*gpuTimestampPools[currentImage], 0, 2);\n'
+        '\t\tcommandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eTopOfPipe, *gpuTimestampPools[currentImage], 0);\n'
+        '\t\tgpuTimestampRecording = true;\n'
+        '\t}\n'
+        '\tassert(!rendering);'
+    )
     bridge_gate = '''&& fgPrevExtent == extent;
 		const bool eligible = interpolate;
 		if ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
@@ -480,32 +564,59 @@ void main()
 		interpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
 '''
     replace_once(context_cpp, 'fgPrevExtent == extent;', 'fgPrevExtent == extent;\n' + '\n'.join(bridge_gate.splitlines()[1:]))
-    # EndFrame returns true only after graphicsQueue.submit accepts the source frame.
-    # A false return explicitly aborts the pending temporal-history transaction.
+    # The frame bridge commits only after EndFrame has submitted successfully.
     replace_once(
         context_cpp,
-        'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\\n{\\n\\tif (!IsValid())\\n\\t\\treturn;',
-        'bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\\n{\\n\\tif (!IsValid())\\n\\t\\treturn false;'
+        'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\n{\n\tif (!IsValid())\n\t\treturn;',
+        'bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\n{\n\tif (!IsValid()) {\n'
+        '\t\tgpuTimestampRecording = false;\n\t\treturn false;\n\t}'
     )
     replace_once(
         context_cpp,
-        '\\trenderDone = true;\\n}\\n\\nvoid VulkanContext::Present() noexcept',
-        '\\trenderDone = true;\\n\\treturn true;\\n}\\n\\nvoid VulkanContext::Present() noexcept'
+        'commandBuffer.endRenderPass();\n\tcommandBuffer.end();',
+        'commandBuffer.endRenderPass();\n'
+        '\tif (gpuTimestampRecording && currentImage < gpuTimestampPools.size())\n'
+        '\t\tcommandBuffer.writeTimestamp(vk::PipelineStageFlagBits::eBottomOfPipe, *gpuTimestampPools[currentImage], 1);\n'
+        '\tcommandBuffer.end();'
+    )
+    replace_once(
+        context_cpp,
+        'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);',
+        'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n'
+        '\tif (gpuTimestampRecording && currentImage < gpuTimestampPending.size())\n'
+        '\t\tgpuTimestampPending[currentImage] = 1;\n'
+        '\tgpuTimestampRecording = false;\n'
+        '\tassert(rendering);'
+    )
+    replace_once(
+        context_cpp,
+        '\trenderDone = true;\n}\n\nvoid VulkanContext::Present() noexcept',
+        '\trenderDone = true;\n\treturn true;\n}\n\nvoid VulkanContext::Present() noexcept'
     )
     replace_once(
         context_h,
-        '\\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());',
-        '\\tbool EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'
+        '\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());',
+        '\tbool EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'
     )
     replace_once(
         context_cpp,
-        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\\n\\t\\t\\tEndFrame(overlayCmdBuffer);\\n\\t\\t\\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();',
-        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\\n\\t\\t\\tif (EndFrame(overlayCmdBuffer))\\n\\t\\t\\t\\twhatsNextBridge.commit_real_frame();\\n\\t\\t\\telse\\n\\t\\t\\t\\twhatsNextBridge.abort_real_frame();\\n\\t\\t\\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'
+        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\n\t\t\tEndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();',
+        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\n'
+        '\t\t\tif (EndFrame(overlayCmdBuffer))\n'
+        '\t\t\t\twhatsNextBridge.commit_real_frame();\n'
+        '\t\t\telse\n'
+        '\t\t\t\twhatsNextBridge.abort_real_frame();\n'
+        '\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'
     )
     replace_once(
         context_cpp,
         '} catch (const InvalidVulkanContext&) {\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}',
-        '} catch (const InvalidVulkanContext&) {\n\t\t\twhatsNextBridge.abort_real_frame();\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}'
+        '} catch (const InvalidVulkanContext&) {\n'
+        '\t\t\twhatsNextBridge.abort_real_frame();\n'
+        '\t\t\tgpuTimestampRecording = false;\n'
+        '\t\t\t// Re-create swap chain\n'
+        '\t\t\tresized = true;\n'
+        '\t\t}'
     )
 
     replace_once(
@@ -644,6 +755,35 @@ void main()
     )
     replace_once(
         context_h,
+        '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);',
+        '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);\n'
+        '\tbool GetLastGpuFrameTimeMs(double& milliseconds) const {\n'
+        '\t\tif (!lastGpuFrameTimeValid) return false;\n'
+        '\t\tmilliseconds = lastGpuFrameTimeMs;\n'
+        '\t\treturn true;\n'
+        '\t}\n'
+        '\tbool SupportsGpuTimestamps() const { return gpuTimestampSupported; }'
+    )
+    replace_once(
+        context_h,
+        '\tbool renderDone = false;',
+        '\tbool renderDone = false;\n'
+        '\tbool gpuTimestampSupported = false;\n'
+        '\tbool gpuTimestampRecording = false;\n'
+        '\tbool lastGpuFrameTimeValid = false;\n'
+        '\tu32 gpuTimestampValidBits = 0;\n'
+        '\tdouble gpuTimestampPeriodNs = 0.0;\n'
+        '\tdouble lastGpuFrameTimeMs = 0.0;'
+    )
+    replace_once(
+        context_h,
+        '\tstd::vector<vk::UniqueFence> drawFences;',
+        '\tstd::vector<vk::UniqueFence> drawFences;\n'
+        '\tstd::vector<vk::UniqueQueryPool> gpuTimestampPools;\n'
+        '\tstd::vector<uint8_t> gpuTimestampPending;'
+    )
+    replace_once(
+        context_h,
         '\tstd::unique_ptr<QuadPipeline> quadRotatePipeline;\n',
         '\tstd::unique_ptr<QuadPipeline> quadRotatePipeline;\n#ifdef __ORBIS__\n'
         '\tstd::unique_ptr<QuadPipeline> quadMiniDlssPipeline;\n'
@@ -732,6 +872,13 @@ void main()
         raise SystemExit("EndFrame declaration does not match its boolean submission result.")
     if "whatsNextBridge.abort_real_frame();" not in integrated_context:
         raise SystemExit("Renderer abort path does not close the pending source-frame transaction.")
+    if "gpu_timestamp_math.cpp" not in integrated_cmake:
+        raise SystemExit("GPU timestamp conversion helper is missing from the renderer build.")
+    for marker in ("gpuTimestampPools", "vk::PipelineStageFlagBits::eTopOfPipe", "vk::PipelineStageFlagBits::eBottomOfPipe", "gpuTimestampPending[currentImage] = 1;"):
+        if marker not in integrated_context:
+            raise SystemExit("Vulkan GPU timestamp lifecycle is incomplete: " + marker)
+    if "GetLastGpuFrameTimeMs(double& milliseconds) const" not in context_h.read_text(encoding="utf-8"):
+        raise SystemExit("The Vulkan renderer does not expose completed GPU frame-time samples.")
     if "quadMiniDlssDrawer->Draw" not in integrated_context:
         raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
