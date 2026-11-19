@@ -258,6 +258,10 @@ void main()
         (context_cpp, 'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{'),
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
+        (context_cpp, 'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\\n{\\n\\tif (!IsValid())\\n\\t\\treturn;'),
+        (context_cpp, '\\trenderDone = true;\\n}\\n\\nvoid VulkanContext::Present() noexcept'),
+        (context_h, '\\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'),
+        (context_cpp, 'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\\n\\t\\t\\tEndFrame(overlayCmdBuffer);\\n\\t\\t\\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
         (context_cpp, 'EndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
         (context_cpp, '} catch (const InvalidVulkanContext&) {\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}'),
         (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
@@ -464,10 +468,27 @@ void main()
 		interpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
 '''
     replace_once(context_cpp, 'fgPrevExtent == extent;', 'fgPrevExtent == extent;\n' + '\n'.join(bridge_gate.splitlines()[1:]))
+    # EndFrame returns true only after graphicsQueue.submit accepts the source frame.
+    # A false return explicitly aborts the pending temporal-history transaction.
     replace_once(
         context_cpp,
-        'EndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();',
-        'EndFrame(overlayCmdBuffer);\n\t\t\twhatsNextBridge.commit_real_frame(); // command buffer accepted for submission\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'
+        'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\\n{\\n\\tif (!IsValid())\\n\\t\\treturn;',
+        'bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\\n{\\n\\tif (!IsValid())\\n\\t\\treturn false;'
+    )
+    replace_once(
+        context_cpp,
+        '\\trenderDone = true;\\n}\\n\\nvoid VulkanContext::Present() noexcept',
+        '\\trenderDone = true;\\n\\treturn true;\\n}\\n\\nvoid VulkanContext::Present() noexcept'
+    )
+    replace_once(
+        context_h,
+        '\\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());',
+        '\\tbool EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'
+    )
+    replace_once(
+        context_cpp,
+        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\\n\\t\\t\\tEndFrame(overlayCmdBuffer);\\n\\t\\t\\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();',
+        'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\\n\\t\\t\\tif (EndFrame(overlayCmdBuffer))\\n\\t\\t\\t\\twhatsNextBridge.commit_real_frame();\\n\\t\\t\\telse\\n\\t\\t\\t\\twhatsNextBridge.abort_real_frame();\\n\\t\\t\\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'
     )
     replace_once(
         context_cpp,
@@ -687,8 +708,16 @@ void main()
     for marker in ("considerMotionCandidate", "textureConfidence", "disocclusionReject", "mo.w"):
         if marker not in integrated_frame_gen:
             raise SystemExit("ANR-inspired confidence-aware frame generation is incomplete: " + marker)
-    if "EndFrame(overlayCmdBuffer);\n\t\t\twhatsNextBridge.commit_real_frame();" not in integrated_context:
-        raise SystemExit("Source-frame history commit is not after successful command-buffer submission.")
+    expected_submission_branch = ("if (EndFrame(overlayCmdBuffer))\\n"
+        "\\t\\t\\t\\twhatsNextBridge.commit_real_frame();\\n"
+        "\\t\\t\\telse\\n"
+        "\\t\\t\\t\\twhatsNextBridge.abort_real_frame();")
+    if expected_submission_branch not in integrated_context:
+        raise SystemExit("Source-frame history is not committed/aborted from the explicit EndFrame submission result.")
+    if "bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)" not in integrated_context or "return false;" not in integrated_context or "return true;" not in integrated_context:
+        raise SystemExit("EndFrame does not expose an explicit submission-success result.")
+    if "bool EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());" not in context_h.read_text(encoding="utf-8"):
+        raise SystemExit("EndFrame declaration does not match its boolean submission result.")
     if "whatsNextBridge.abort_real_frame();" not in integrated_context:
         raise SystemExit("Renderer abort path does not close the pending source-frame transaction.")
     if "quadMiniDlssDrawer->Draw" not in integrated_context:
