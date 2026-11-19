@@ -254,7 +254,16 @@ void main()
     preflight_anchors = (
         (cmake, 'target_compile_definitions(${PROJECT_NAME} PRIVATE USE_VULKAN HAVE_VULKAN)\n'),
         (cmake, '            frame_gen.cpp\n'),
+        (cmake, '            whats_next/src/render_budget_controller.cpp\n'),
         (context_cpp, '#include "frame_gen.h"\n'),
+        (context_cpp, 'imageViews.resize(swapChainImages.size());\n\t\tcommandPools.reserve(swapChainImages.size());'),
+        (context_cpp, 'void VulkanContext::NewFrame()\n{'),
+        (context_cpp, 'commandBuffer.endRenderPass();\n\tcommandBuffer.end();'),
+        (context_cpp, 'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);'),
+        (context_h, '\tbool GetLastFrame(std::vector<u8>& data, int& width, int& height);'),
+        (context_h, '\tbool renderDone = false;'),
+        (context_h, '\tstd::vector<vk::UniqueFence> drawFences;'),
+        (context_cpp, '\tswapChain.reset();\n\timageViews.clear();'),
         (context_cpp, 'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{'),
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
@@ -310,6 +319,8 @@ void main()
         module / "src/frame_generation_controller.cpp",
         module / "src/frame_generation_bridge.cpp",
         module / "src/render_budget_controller.cpp",
+        module / "src/gpu_timestamp_math.cpp",
+        module / "include/whats_next/gpu_timestamp_math.hpp",
         module / "shaders/edge_aware_sharpen.comp",
         module / "shaders/mini_dlss_upscale.comp",
     )
@@ -323,7 +334,7 @@ void main()
     (target / "src").mkdir(parents=True, exist_ok=True)
     for name in ("history_gate.cpp", "frame_generation_policy.cpp",
                  "frame_generation_controller.cpp", "frame_generation_bridge.cpp",
-                 "render_budget_controller.cpp"):
+                 "render_budget_controller.cpp", "gpu_timestamp_math.cpp"):
         shutil.copy2(module / "src" / name, target / "src" / name)
     shader_target = target / "shaders"
     shader_target.mkdir(parents=True, exist_ok=True)
@@ -345,11 +356,12 @@ void main()
         '            whats_next/src/frame_generation_controller.cpp\n'
         '            whats_next/src/frame_generation_bridge.cpp\n'
         '            whats_next/src/render_budget_controller.cpp\n'
+        '            whats_next/src/gpu_timestamp_math.cpp\n'
     )
     replace_once(
         context_cpp,
         '#include "frame_gen.h"\n',
-        '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n'
+        '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/gpu_timestamp_math.hpp"\n'
     )
     replace_once(
         context_cpp,
