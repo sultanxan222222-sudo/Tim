@@ -916,7 +916,7 @@ void main()
         raise SystemExit("Renderer abort path does not close the pending source-frame transaction.")
     if "gpu_timestamp_math.cpp" not in integrated_cmake:
         raise SystemExit("GPU timestamp conversion helper is missing from the renderer build.")
-    for marker in ("gpuTimestampPools", "vk::PipelineStageFlagBits::eTopOfPipe", "vk::PipelineStageFlagBits::eBottomOfPipe", "gpuTimestampPending[currentImage] = 1;", "whatsNextRenderBudget.update", "temporal_effects_allowed", "miniDlssProfile.sharpening_strength", "miniDlssPushConstants"):
+    for marker in ("gpuTimestampPools", "vk::PipelineStageFlagBits::eTopOfPipe", "vk::PipelineStageFlagBits::eBottomOfPipe", "gpuTimestampPending[currentImage] = 1;", "whatsNextRenderBudget.update", "temporal_effects_allowed", "miniDlssProfile.sharpening_strength", "miniDlssProfile.sharpening_strength > 0.0f", "miniDlssPushConstants"):
         if marker not in integrated_context:
             raise SystemExit("Vulkan GPU timestamp lifecycle is incomplete: " + marker)
     if "GetLastGpuFrameTimeMs(double& milliseconds) const" not in context_h.read_text(encoding="utf-8"):
