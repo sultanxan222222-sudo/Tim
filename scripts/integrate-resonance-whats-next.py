@@ -258,6 +258,8 @@ void main()
         (context_cpp, 'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{'),
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
+        (context_cpp, 'EndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
+        (context_cpp, '} catch (const InvalidVulkanContext&) {\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}'),
         (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
         (context_h, '#include "vulkan.h"\n'),
         (context_h, '\tbool fgRealPending = false;\n'),
@@ -449,19 +451,29 @@ void main()
     )
 
     bridge_gate = '''&& fgPrevExtent == extent;
-\t\tconst bool eligible = interpolate;
-\t\tif ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
-\t\t{
-\t\t\t++fgResourceGeneration;
-\t\t\twhatsNextBridge.reset();
-\t\t}
-\t\tconst auto decision = whatsNextBridge.begin_real_frame(
-\t\t\t\teligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
-\t\t\t\tfgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
-\t\t\t\t\t(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
-\t\tinterpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
-\t\twhatsNextBridge.commit_real_frame(); // commit each real source frame after the renderer accepts its image'''
+		const bool eligible = interpolate;
+		if ((extent.width != fgPrevExtent.width || extent.height != fgPrevExtent.height) && fgPrevExtent.width != 0)
+		{
+			++fgResourceGeneration;
+			whatsNextBridge.reset();
+		}
+		const auto decision = whatsNextBridge.begin_real_frame(
+				eligible, extent.width, extent.height, whats_next::PixelFormat::RGBA8,
+				fgResourceGeneration, fgGameSession, whats_next::PresentationCadence{
+					(gap > 2 ? 3U : static_cast<std::uint32_t>(gap))});
+		interpolate = eligible && decision == whats_next::FrameGenerationDecision::GenerateIntermediate;
+'''
     replace_once(context_cpp, 'fgPrevExtent == extent;', 'fgPrevExtent == extent;\n' + '\n'.join(bridge_gate.splitlines()[1:]))
+    replace_once(
+        context_cpp,
+        'EndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();',
+        'EndFrame(overlayCmdBuffer);\n\t\t\twhatsNextBridge.commit_real_frame(); // command buffer accepted for submission\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'
+    )
+    replace_once(
+        context_cpp,
+        '} catch (const InvalidVulkanContext&) {\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}',
+        '} catch (const InvalidVulkanContext&) {\n\t\t\twhatsNextBridge.abort_real_frame();\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}'
+    )
 
     replace_once(
         context_cpp,
@@ -663,6 +675,7 @@ void main()
     required_hooks = (
         "whatsNextBridge.begin_real_frame",
         "whatsNextBridge.commit_real_frame",
+        "whatsNextBridge.abort_real_frame",
         "whatsNextBridge.reset()",
     )
     missing_hooks = [hook for hook in required_hooks if hook not in integrated_context]
@@ -674,6 +687,10 @@ void main()
     for marker in ("considerMotionCandidate", "textureConfidence", "disocclusionReject", "mo.w"):
         if marker not in integrated_frame_gen:
             raise SystemExit("ANR-inspired confidence-aware frame generation is incomplete: " + marker)
+    if "EndFrame(overlayCmdBuffer);\\n\\t\\t\\twhatsNextBridge.commit_real_frame();" not in integrated_context:
+        raise SystemExit("Source-frame history commit is not after successful command-buffer submission.")
+    if "whatsNextBridge.abort_real_frame();" not in integrated_context:
+        raise SystemExit("Renderer abort path does not close the pending source-frame transaction.")
     if "quadMiniDlssDrawer->Draw" not in integrated_context:
         raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
