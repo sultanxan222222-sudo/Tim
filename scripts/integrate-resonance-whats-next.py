@@ -327,6 +327,7 @@ void main()
         module / "src/frame_generation_policy.cpp",
         module / "src/frame_generation_controller.cpp",
         module / "src/frame_generation_bridge.cpp",
+        module / "src/resonance_frame_adapter.cpp",
         module / "src/render_budget_controller.cpp",
         module / "src/gpu_timestamp_math.cpp",
         module / "include/whats_next/gpu_timestamp_math.hpp",
@@ -343,7 +344,7 @@ void main()
     (target / "src").mkdir(parents=True, exist_ok=True)
     for name in ("history_gate.cpp", "frame_generation_policy.cpp",
                  "frame_generation_controller.cpp", "frame_generation_bridge.cpp",
-                 "render_budget_controller.cpp", "gpu_timestamp_math.cpp"):
+                 "resonance_frame_adapter.cpp", "render_budget_controller.cpp", "gpu_timestamp_math.cpp"):
         shutil.copy2(module / "src" / name, target / "src" / name)
     shader_target = target / "shaders"
     shader_target.mkdir(parents=True, exist_ok=True)
@@ -364,6 +365,7 @@ void main()
         '            whats_next/src/frame_generation_policy.cpp\n'
         '            whats_next/src/frame_generation_controller.cpp\n'
         '            whats_next/src/frame_generation_bridge.cpp\n'
+        '            whats_next/src/resonance_frame_adapter.cpp\n'
         '            whats_next/src/render_budget_controller.cpp\n'
         '            whats_next/src/gpu_timestamp_math.cpp\n'
     )
