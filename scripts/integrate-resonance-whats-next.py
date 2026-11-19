@@ -376,7 +376,7 @@ void main()
     replace_once(
         context_cpp,
         '#include "frame_gen.h"\n',
-        '#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/gpu_timestamp_math.hpp"\n#include "whats_next/render_budget_controller.hpp"\n'
+        '#include <utility>\n#include "frame_gen.h"\n#include "whats_next/frame_generation_bridge.hpp"\n#include "whats_next/gpu_timestamp_math.hpp"\n#include "whats_next/render_budget_controller.hpp"\n'
     )
     replace_once(
         context_cpp,
