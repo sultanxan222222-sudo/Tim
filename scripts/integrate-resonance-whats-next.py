@@ -257,6 +257,8 @@ void main()
         (cmake, '            whats_next/src/render_budget_controller.cpp\n'),
         (context_cpp, '#include "frame_gen.h"\n'),
         (context_cpp, 'imageViews.resize(swapChainImages.size());\n\t\tcommandPools.reserve(swapChainImages.size());'),
+        (context_cpp, 'device->waitIdle();\n\n\t\tif (!drawFences.empty())'),
+        (context_cpp, 'if (graphicsQueueIndex == presentQueueIndex)\n'),
         (context_cpp, 'void VulkanContext::NewFrame()\n{'),
         (context_cpp, 'commandBuffer.endRenderPass();\n\tcommandBuffer.end();'),
         (context_cpp, 'graphicsQueue.submit(submitInfo, *drawFences[currentImage]);\n\tassert(rendering);'),
@@ -788,7 +790,7 @@ void main()
         '\tstd::vector<vk::UniqueFence> drawFences;',
         '\tstd::vector<vk::UniqueFence> drawFences;\n'
         '\tstd::vector<vk::UniqueQueryPool> gpuTimestampPools;\n'
-        '\tstd::vector<uint8_t> gpuTimestampPending;'
+        '\tstd::vector<u8> gpuTimestampPending;'
     )
     replace_once(
         context_h,
