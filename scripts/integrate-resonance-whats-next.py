@@ -273,10 +273,10 @@ void main()
         (context_cpp, 'void VulkanContext::CreateSwapChain()\n{\n\ttry\n\t{'),
         (context_cpp, '#ifdef __ORBIS__\n\t// a new frame from the renderer'),
         (context_cpp, 'fgPrevExtent == extent;'),
-        (context_cpp, 'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\\n{\\n\\tif (!IsValid())\\n\\t\\treturn;'),
-        (context_cpp, '\\trenderDone = true;\\n}\\n\\nvoid VulkanContext::Present() noexcept'),
-        (context_h, '\\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'),
-        (context_cpp, 'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\\n\\t\\t\\tEndFrame(overlayCmdBuffer);\\n\\t\\t\\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
+        (context_cpp, 'void VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)\n{\n\tif (!IsValid())\n\t\treturn;'),
+        (context_cpp, '\trenderDone = true;\n}\n\nvoid VulkanContext::Present() noexcept'),
+        (context_h, '\tvoid EndFrame(vk::CommandBuffer cmdBuffer = vk::CommandBuffer());'),
+        (context_cpp, 'imguiDriver->renderDrawData(ImGui::GetDrawData(), false);\n\t\t\tEndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
         (context_cpp, 'EndFrame(overlayCmdBuffer);\n\t\t\tstatic_cast<BaseVulkanRenderer*>(renderer)->RenderVideoRouting();'),
         (context_cpp, '} catch (const InvalidVulkanContext&) {\n\t\t\t// Re-create swap chain\n\t\t\tresized = true;\n\t\t}'),
         (context_cpp, '\tif (gui_is_open())\n\t\tfgPrevView = vk::ImageView();'),
@@ -625,6 +625,14 @@ void main()
         '\tif (gui_is_open())\n\t{\n\t\tif (!fgWasGuiOpen)\n\t\t{\n\t\t\t++fgGameSession;\n\t\t\twhatsNextBridge.reset();\n\t\t}\n\t\tfgPrevView = vk::ImageView();\n\t}\n\tfgWasGuiOpen = gui_is_open();'
     )
     replace_once(
+        context_cpp,
+        '\tswapChain.reset();\n\timageViews.clear();',
+        '\tgpuTimestampPools.clear();\n'
+        '\tgpuTimestampPending.clear();\n'
+        '\tgpuTimestampRecording = false;\n'
+        '\tswapChain.reset();\n\timageViews.clear();'
+    )
+    replace_once(
         context_h,
         '\tbool fgRealPending = false;\n',
         '\tbool fgRealPending = false;\n\twhats_next::FrameGenerationBridge whatsNextBridge;\n'
@@ -860,10 +868,10 @@ void main()
     for marker in ("considerMotionCandidate", "textureConfidence", "disocclusionReject", "mo.w"):
         if marker not in integrated_frame_gen:
             raise SystemExit("ANR-inspired confidence-aware frame generation is incomplete: " + marker)
-    expected_submission_branch = ("if (EndFrame(overlayCmdBuffer))\\n"
-        "\\t\\t\\t\\twhatsNextBridge.commit_real_frame();\\n"
-        "\\t\\t\\telse\\n"
-        "\\t\\t\\t\\twhatsNextBridge.abort_real_frame();")
+    expected_submission_branch = ("if (EndFrame(overlayCmdBuffer))\n"
+        "\t\t\t\twhatsNextBridge.commit_real_frame();\n"
+        "\t\t\telse\n"
+        "\t\t\t\twhatsNextBridge.abort_real_frame();")
     if expected_submission_branch not in integrated_context:
         raise SystemExit("Source-frame history is not committed/aborted from the explicit EndFrame submission result.")
     if "bool VulkanContext::EndFrame(vk::CommandBuffer overlayCmdBuffer)" not in integrated_context or "return false;" not in integrated_context or "return true;" not in integrated_context:
