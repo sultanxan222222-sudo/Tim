@@ -42,6 +42,26 @@ int main() {
     assert(!balanced.temporal_effects_allowed);
     assert(quality.temporal_effects_allowed);
 
+
+    // The PS4 runtime starts at Quality only as a ceiling for explicitly enabled
+    // effects. Sustained measured overload moves it down and disables temporal work.
+    governor.reset(RenderQuality::Quality);
+    assert(governor.quality() == RenderQuality::Quality);
+    assert(RenderBudgetController::profile(governor.quality()).temporal_effects_allowed);
+    for (int i = 0; i < 2; ++i)
+        assert(governor.update(17.0, 16.667) == RenderQuality::Quality);
+    assert(governor.update(17.0, 16.667) == RenderQuality::Balanced);
+    assert(!RenderBudgetController::profile(governor.quality()).temporal_effects_allowed);
+    for (int i = 0; i < 3; ++i)
+        governor.update(17.0, 16.667);
+    assert(governor.quality() == RenderQuality::Eco);
+    assert(RenderBudgetController::profile(governor.quality()).sharpening_strength == 0.08f);
+
+    // Long-term headroom restores one tier at a time, never instantly.
+    for (int i = 0; i < 4; ++i)
+        assert(governor.update(5.0, 16.667) == RenderQuality::Eco);
+    assert(governor.update(5.0, 16.667) == RenderQuality::Balanced);
+
     governor.reset();
     assert(governor.quality() == RenderQuality::Balanced);
     assert(governor.valid_samples() == 0);
