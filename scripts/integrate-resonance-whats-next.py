@@ -558,7 +558,7 @@ void main()
         '\t\t\tif (currentQuality != previousQuality) {\n'
         '\t\t\t\tconst char* qualityName = currentQuality == whats_next::RenderQuality::Eco ? "eco" :\n'
         '\t\t\t\t\t\t(currentQuality == whats_next::RenderQuality::Balanced ? "balanced" : "quality");\n'
-        '\t\t\t\tNOTICE_LOG(RENDERER, "WHAT\\'S NEXT adaptive quality: %s (GPU %.2f ms / %.2f ms budget)",\n'
+        '\t\t\t\tNOTICE_LOG(RENDERER, "Adaptive GPU quality: %s (GPU %.2f ms / %.2f ms budget)",\n'
         '\t\t\t\t\t\tqualityName, frameMs, frameBudgetMs);\n'
         '\t\t\t}\n'
         '\t\t}\n'
@@ -916,7 +916,7 @@ void main()
         raise SystemExit("Renderer abort path does not close the pending source-frame transaction.")
     if "gpu_timestamp_math.cpp" not in integrated_cmake:
         raise SystemExit("GPU timestamp conversion helper is missing from the renderer build.")
-    for marker in ("gpuTimestampPools", "vk::PipelineStageFlagBits::eTopOfPipe", "vk::PipelineStageFlagBits::eBottomOfPipe", "gpuTimestampPending[currentImage] = 1;"):
+    for marker in ("gpuTimestampPools", "vk::PipelineStageFlagBits::eTopOfPipe", "vk::PipelineStageFlagBits::eBottomOfPipe", "gpuTimestampPending[currentImage] = 1;", "whatsNextRenderBudget.update", "temporal_effects_allowed", "miniDlssProfile.sharpening_strength", "miniDlssPushConstants"):
         if marker not in integrated_context:
             raise SystemExit("Vulkan GPU timestamp lifecycle is incomplete: " + marker)
     if "GetLastGpuFrameTimeMs(double& milliseconds) const" not in context_h.read_text(encoding="utf-8"):
