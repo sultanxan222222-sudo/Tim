@@ -632,7 +632,7 @@ void main()
     replace_once(option_cpp,
         'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n',
         'Option<bool> FrameGeneration("rend.FrameGeneration", false);\n'
-        'Option<bool> MiniDLSS("rend.MiniDLSS", true);\n')
+        'Option<bool> MiniDLSS("rend.MiniDLSS", false);\n')
     replace_once(option_cpp,
         'Option<int> RenderResolution("rend.Resolution", 480);',
         'Option<int> RenderResolution("rend.Resolution", 480);')
@@ -695,6 +695,11 @@ void main()
         raise SystemExit("Mini-DLSS source-frame finishing path was not installed.")
     if "MINI_DLSS" not in shaders_cpp.read_text(encoding="utf-8"):
         raise SystemExit("Mini-DLSS quad shader variant was not installed.")
+    integrated_options = option_cpp.read_text(encoding="utf-8")
+    if 'Option<bool> FrameGeneration("rend.FrameGeneration", false);' not in integrated_options:
+        raise SystemExit("Frame generation must remain disabled by default until PS4 runtime validation passes.")
+    if 'Option<bool> MiniDLSS("rend.MiniDLSS", false);' not in integrated_options:
+        raise SystemExit("Mini-DLSS must remain opt-in until PS4 image-quality and performance validation passes.")
     integrated_menu = settings_menu_cpp.read_text(encoding="utf-8")
     for label in ("Генерация промежуточных кадров", "Мини-DLSS — повышение чёткости"):
         if label not in integrated_menu:
