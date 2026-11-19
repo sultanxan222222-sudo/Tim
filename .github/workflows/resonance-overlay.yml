@@ -73,10 +73,15 @@ jobs:
           git -C /tmp/flycast diff --check
           test -f /tmp/flycast/core/rend/vulkan/whats_next/shaders/mini_dlss_upscale.comp
           test -f /tmp/flycast/core/rend/vulkan/whats_next/src/render_budget_controller.cpp
+          test -f /tmp/flycast/core/rend/vulkan/whats_next/src/gpu_timestamp_math.cpp
+          grep -q 'gpu_timestamp_math.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
+          grep -q 'vk::PipelineStageFlagBits::eTopOfPipe' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
+          grep -q 'vk::PipelineStageFlagBits::eBottomOfPipe' /tmp/flycast/core/rend/vulkan/vulkan_context.cpp
+          grep -q 'GetLastGpuFrameTimeMs' /tmp/flycast/core/rend/vulkan/vulkan_context.h
           grep -q 'render_budget_controller.cpp' /tmp/flycast/core/rend/vulkan/CMakeLists.txt
       - name: Compile WHAT'S NEXT renderer bridge sources
         run: |
-          for source in history_gate frame_generation_policy frame_generation_controller frame_generation_bridge resonance_frame_adapter render_budget_controller; do
+          for source in history_gate frame_generation_policy frame_generation_controller frame_generation_bridge resonance_frame_adapter render_budget_controller gpu_timestamp_math; do
             g++ -std=c++17 -Wall -Wextra -Wpedantic -Werror \
               -I /tmp/flycast/core/rend/vulkan/whats_next/include \
               -fsyntax-only "/tmp/flycast/core/rend/vulkan/whats_next/src/${source}.cpp"
