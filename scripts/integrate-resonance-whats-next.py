@@ -687,7 +687,7 @@ void main()
     for marker in ("considerMotionCandidate", "textureConfidence", "disocclusionReject", "mo.w"):
         if marker not in integrated_frame_gen:
             raise SystemExit("ANR-inspired confidence-aware frame generation is incomplete: " + marker)
-    if "EndFrame(overlayCmdBuffer);\\n\\t\\t\\twhatsNextBridge.commit_real_frame();" not in integrated_context:
+    if "EndFrame(overlayCmdBuffer);\n\t\t\twhatsNextBridge.commit_real_frame();" not in integrated_context:
         raise SystemExit("Source-frame history commit is not after successful command-buffer submission.")
     if "whatsNextBridge.abort_real_frame();" not in integrated_context:
         raise SystemExit("Renderer abort path does not close the pending source-frame transaction.")
