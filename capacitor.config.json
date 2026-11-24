@@ -1,0 +1,8 @@
+{
+  "appId": "com.sultanxan222222.santaflight",
+  "appName": "Santa Flight",
+  "webDir": "santa-flight",
+  "server": {
+    "androidScheme": "https"
+  }
+}
