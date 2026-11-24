@@ -1,4 +1,4 @@
-name: Santa Flight build
+name: Santa Flight release
 on:
   push:
     branches: [feature/santa-flight-16bit]
@@ -6,24 +6,44 @@ on:
       - 'santa-flight/**'
       - '.github/workflows/santa-flight.yml'
   workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: santa-flight-pages
+  cancel-in-progress: true
 jobs:
-  validate-and-package:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Validate JavaScript syntax
+      - name: Validate game script
         run: node --check santa-flight/game.js
-      - name: Package browser game
+      - name: Prepare release package
         run: |
-          cd santa-flight
+          mkdir -p release
+          cp -R santa-flight/. release/
+          cd release
           zip -r ../Santa-Flight-16bit.zip .
-      - name: Upload game ZIP
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: Santa-Flight-16bit
           path: Santa-Flight-16bit.zip
           if-no-files-found: error
-          retention-days: 30
+          retention-days: 90
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: release
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
