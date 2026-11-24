@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+  <meta name="theme-color" content="#07152d">
+  <title>Santa Flight — 16-bit</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="cabinet">
+    <header class="topbar"><div class="brand">SANTA <span>FLIGHT</span></div><div class="edition">16-BIT WINTER RUN</div></header>
+    <section class="screen-wrap">
+      <canvas id="game" width="960" height="540" aria-label="Игра Santa Flight"></canvas>
+      <div class="hud"><div>СЧЁТ <b id="score">000000</b></div><div>ПОДАРКИ <b id="gifts">0</b></div><div>ЖИЗНИ <b id="lives">♥ ♥ ♥</b></div></div>
+      <div class="overlay" id="overlay">
+        <div class="panel">
+          <div class="pixel-star">✦</div><p class="eyebrow">RETRO ARCADE • 1994</p>
+          <h1 id="panel-title">ПОЛЁТ<br><span>САНТЫ</span></h1>
+          <p id="panel-copy">Спаси праздник! Лети над ночным городом, собирай подарки и уворачивайся от препятствий.</p>
+          <button id="start">НАЧАТЬ ПОЛЁТ</button>
+          <small>ПК: ↑ ↓ / W S или мышь · Телефон: веди пальцем</small>
+        </div>
+      </div>
+    </section>
+    <footer><span>❄ NORTH POLE ARCADE</span><span>СОБИРАЙ ПОДАРКИ · ИЗБЕГАЙ ОПАСНОСТЕЙ</span></footer>
+  </main>
+  <script src="game.js"></script>
+</body>
+</html>
