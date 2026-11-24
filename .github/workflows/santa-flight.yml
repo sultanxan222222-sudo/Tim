@@ -1,0 +1,29 @@
+name: Santa Flight build
+on:
+  push:
+    branches: [feature/santa-flight-16bit]
+    paths:
+      - 'santa-flight/**'
+      - '.github/workflows/santa-flight.yml'
+  workflow_dispatch:
+jobs:
+  validate-and-package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate JavaScript syntax
+        run: node --check santa-flight/game.js
+      - name: Package browser game
+        run: |
+          cd santa-flight
+          zip -r ../Santa-Flight-16bit.zip .
+      - name: Upload game ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: Santa-Flight-16bit
+          path: Santa-Flight-16bit.zip
+          if-no-files-found: error
+          retention-days: 30
